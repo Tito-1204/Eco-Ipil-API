@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EcoIpil.API", "EcoIpil.API.csproj", "{EC7358B3-39E4-F530-D819-461D7F1BADC2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EC7358B3-39E4-F530-D819-461D7F1BADC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC7358B3-39E4-F530-D819-461D7F1BADC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC7358B3-39E4-F530-D819-461D7F1BADC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC7358B3-39E4-F530-D819-461D7F1BADC2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6F3012EE-6F32-4AA2-B9C4-D7D3A90FB73C}
+	EndGlobalSection
+EndGlobal
