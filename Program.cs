@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+QuestPDF.Settings.License = LicenseType.Community;
 
 // Configuração do Swagger
 builder.Services.AddEndpointsApiExplorer();
