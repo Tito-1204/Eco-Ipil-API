@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EcoIpil.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ab44fb0af13f12081f6fedc22072f19fde1ec61a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+58630f252a26c61b73ce3c9179bcd7e6440a5619")]
 [assembly: System.Reflection.AssemblyProductAttribute("EcoIpil.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EcoIpil.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
