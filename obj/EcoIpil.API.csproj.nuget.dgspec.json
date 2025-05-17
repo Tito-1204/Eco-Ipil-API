@@ -58,6 +58,10 @@
               "target": "Package",
               "version": "[2.0.123, )"
             },
+            "HarfBuzzSharp.NativeAssets.Linux": {
+              "target": "Package",
+              "version": "[2.8.2, )"
+            },
             "MailKit": {
               "target": "Package",
               "version": "[3.0.0, )"
@@ -110,7 +114,11 @@
             },
             "QuestPDF": {
               "target": "Package",
-              "version": "[2023.12.2, )"
+              "version": "[2022.11.0, )"
+            },
+            "SkiaSharp.NativeAssets.Linux.NoDependencies": {
+              "target": "Package",
+              "version": "[2.88.3, )"
             },
             "Supabase": {
               "target": "Package",
@@ -158,6 +166,10 @@
               "version": "[6.0.36, 6.0.36]"
             },
             {
+              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+              "version": "[6.0.36, 6.0.36]"
+            },
+            {
               "name": "Microsoft.NETCore.App.Host.win-x64",
               "version": "[6.0.36, 6.0.36]"
             },
@@ -166,7 +178,15 @@
               "version": "[6.0.36, 6.0.36]"
             },
             {
+              "name": "Microsoft.NETCore.App.Runtime.win-x64",
+              "version": "[6.0.36, 6.0.36]"
+            },
+            {
               "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[6.0.36, 6.0.36]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
               "version": "[6.0.36, 6.0.36]"
             }
           ],
@@ -179,6 +199,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.102\\RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win-x64": {
+          "#import": []
         }
       }
     }
