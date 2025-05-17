@@ -36,9 +36,6 @@ public class TicketService
         _usuarioService = usuarioService;
         _logger = logger;
         _authService = authService;
-
-        // Licenciar o QuestPDF para uso comercial
-        QuestPDF.Settings.License = LicenseType.Community;
     }
 
     // Método auxiliar para gerar um ticket_code de 12 caracteres
