@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>preview</LangVersion>
+    <TrimMode>link</TrimMode>
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>false</PublishSingleFile>
