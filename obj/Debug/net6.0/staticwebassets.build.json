@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "pfdXRZPpJpBoihBKthUNrNI4gBtv+BqO7Aa7l/PPZXI=",
+  "Source": "EcoIpil.API",
+  "BasePath": "_content/EcoIpil.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}

@@ -22,15 +22,15 @@
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
-          "net9.0"
+          "net6.0"
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net9.0": {
-            "targetAlias": "net9.0",
+          "net6.0": {
+            "targetAlias": "net6.0",
             "projectReferences": {}
           }
         },
@@ -47,46 +47,42 @@
         "SdkAnalysisLevel": "9.0.100"
       },
       "frameworks": {
-        "net9.0": {
-          "targetAlias": "net9.0",
+        "net6.0": {
+          "targetAlias": "net6.0",
           "dependencies": {
             "BCrypt.Net-Next": {
               "target": "Package",
-              "version": "[4.0.3, )"
+              "version": "[3.1.0, )"
             },
             "Dapper": {
               "target": "Package",
-              "version": "[2.1.66, )"
+              "version": "[2.0.123, )"
             },
             "MailKit": {
               "target": "Package",
-              "version": "[4.11.0, )"
+              "version": "[3.0.0, )"
             },
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
               "target": "Package",
-              "version": "[9.0.2, )"
+              "version": "[6.0.22, )"
             },
             "Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore": {
               "target": "Package",
-              "version": "[9.0.2, )"
-            },
-            "Microsoft.AspNetCore.OpenApi": {
-              "target": "Package",
-              "version": "[9.0.1, )"
+              "version": "[6.0.10, )"
             },
             "Microsoft.EntityFrameworkCore.Design": {
               "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
               "suppressParent": "All",
               "target": "Package",
-              "version": "[9.0.2, )"
+              "version": "[6.0.20, )"
             },
             "Microsoft.EntityFrameworkCore.InMemory": {
               "target": "Package",
-              "version": "[9.0.2, )"
+              "version": "[6.0.20, )"
             },
             "Microsoft.Extensions.Configuration": {
               "target": "Package",
-              "version": "[9.0.3, )"
+              "version": "[6.0.0, )"
             },
             "MimeKit": {
               "target": "Package",
@@ -94,11 +90,11 @@
             },
             "MySql.Data": {
               "target": "Package",
-              "version": "[9.2.0, )"
+              "version": "[8.0.33, )"
             },
             "MySqlConnector": {
               "target": "Package",
-              "version": "[2.4.0, )"
+              "version": "[2.0.0, )"
             },
             "Newtonsoft.Json": {
               "target": "Package",
@@ -106,11 +102,11 @@
             },
             "Npgsql.EntityFrameworkCore.PostgreSQL": {
               "target": "Package",
-              "version": "[9.0.4, )"
+              "version": "[6.0.8, )"
             },
             "QRCoder": {
               "target": "Package",
-              "version": "[1.4.3, )"
+              "version": "[1.4.1, )"
             },
             "QuestPDF": {
               "target": "Package",
@@ -122,19 +118,19 @@
             },
             "Supabase.Postgrest": {
               "target": "Package",
-              "version": "[4.1.0, )"
+              "version": "[4.0.0, )"
             },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
-              "version": "[7.2.0, )"
+              "version": "[6.5.0, )"
             },
             "System.Drawing.Common": {
               "target": "Package",
-              "version": "[7.0.0, )"
+              "version": "[6.0.0, )"
             },
             "System.Text.Json": {
               "target": "Package",
-              "version": "[9.0.3, )"
+              "version": "[7.0.3, )"
             },
             "postgrest-csharp": {
               "target": "Package",
@@ -142,7 +138,7 @@
             },
             "supabase-csharp": {
               "target": "Package",
-              "version": "[0.16.2, )"
+              "version": "[0.14.0, )"
             }
           },
           "imports": [
@@ -156,6 +152,24 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[6.0.36, 6.0.36]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[6.0.36, 6.0.36]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[6.0.36, 6.0.36]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[6.0.36, 6.0.36]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -164,7 +178,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.102/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.102\\RuntimeIdentifierGraph.json"
         }
       }
     }
