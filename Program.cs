@@ -134,20 +134,19 @@ builder.Services.AddCors(options =>
 });
 
 // Configuração HTTPS
-builder.WebHost.UseUrls("http://0.0.0.0:3000");
+builder.WebHost.UseUrls("http://0.0.0.0:3000", "https://localhost:5001");
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "EcoIpil API v1");
-        c.DocExpansion(DocExpansion.None);
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "EcoIpil API v1");
+    c.DocExpansion(DocExpansion.None);
+});
+
 
 if (!app.Environment.IsDevelopment()) 
 {
