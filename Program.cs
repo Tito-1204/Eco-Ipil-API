@@ -134,7 +134,7 @@ builder.Services.AddCors(options =>
 });
 
 // Configuração HTTPS
-builder.WebHost.UseUrls("http://0.0.0.0:3000", "https://localhost:5001");
+builder.WebHost.UseUrls("http://0.0.0.0:3000");
 
 var app = builder.Build();
 
