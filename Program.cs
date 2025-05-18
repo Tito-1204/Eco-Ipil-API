@@ -134,7 +134,7 @@ builder.Services.AddCors(options =>
 });
 
 // Configuração HTTPS
-builder.WebHost.UseUrls("http://0.0.0.0:3000", "https://localhost:5001");
+builder.WebHost.UseUrls("http://0.0.0.0:3000");
 
 var app = builder.Build();
 
@@ -149,7 +149,10 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment()) 
+{
+    app.UseHttpsRedirection();
+}
 
 // Adicionar o middleware de sessão antes de outros middlewares que dependem de HttpContext
 app.UseSession();
