@@ -109,6 +109,7 @@ public class UsuariosController : ControllerBase
     [HttpGet("google-callback")]
     public async Task<IActionResult> GoogleCallback([FromQuery] string? code, [FromQuery] string? custom_state, [FromQuery] string? error, [FromQuery] string? error_description)
     {
+        _logger.LogInformation("⚡ CALLBACK do Google acionado! code={Code}, custom_state={CustomState}, error={Error}", code, custom_state, error);
         try
         {
             _logger.LogInformation("Callback recebido: code={Code}, custom_state={CustomState}, error={Error}, error_description={ErrorDescription}", code, custom_state, error, error_description);
