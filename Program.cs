@@ -140,12 +140,15 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+if (!app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "EcoIpil API v1");
-    c.DocExpansion(DocExpansion.None);
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "EcoIpil API v1");
+        c.DocExpansion(DocExpansion.None);
+    });
+}
 
 
 if (!app.Environment.IsDevelopment()) 
