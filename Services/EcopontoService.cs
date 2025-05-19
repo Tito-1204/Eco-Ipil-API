@@ -3,8 +3,21 @@ using EcoIpil.API.Models;
 using Supabase;
 using Supabase.Postgrest;
 using static Supabase.Postgrest.Constants;
+using System.Linq; // Adicionado para .Select e .ToList etc.
 
 namespace EcoIpil.API.Services;
+
+// Classe auxiliar simples para buscar o nome do agente.
+// Idealmente, você teria um modelo Agente.cs se fosse usar mais dados do agente.
+public class AgenteInfo
+{
+    [ Supabase.Postgrest.Attributes.PrimaryKey("id", false) ] // false se não for identity ou se for apenas para leitura
+    public long Id { get; set; }
+
+    [ Supabase.Postgrest.Attributes.Column("nome") ]
+    public string Nome { get; set; } = string.Empty;
+}
+
 
 public class EcopontoService
 {
@@ -16,8 +29,8 @@ public class EcopontoService
     }
 
     public async Task<(bool success, string message, List<EcopontoResponseDTO>? ecopontos)> ListarEcopontos(
-        float? latitude = null,
-        float? longitude = null,
+        float? latitude = null, // Usado para centro da busca por raio
+        float? longitude = null, // Usado para centro da busca por raio
         float? raio = null,
         string? material = null,
         string? status = null,
@@ -28,7 +41,7 @@ public class EcopontoService
         {
             var query = _supabaseClient
                 .From<Ecoponto>()
-                .Select("*");
+                .Select("id, created_at, nome, localizacao, status, capacidade, preenchido_atual, sensor_peso, sensor_tipo, sensor_termico, sensor_status, material_suportado, latitude, longitude, agente_responsavel_id"); // Selecionar todos os campos necessários
 
             // Aplicar filtros
             if (!string.IsNullOrEmpty(material))
@@ -41,7 +54,8 @@ public class EcopontoService
                 query = query.Filter("status", Operator.Equals, status);
             }
 
-            // Aplicar paginação (se não estiver filtrando por distância)
+            // A paginação será aplicada APÓS o filtro de distância, se houver.
+            // Se não houver filtro de distância, aplicamos aqui.
             if (!(latitude.HasValue && longitude.HasValue && raio.HasValue))
             {
                 int offset = (pagina - 1) * limite;
@@ -49,19 +63,46 @@ public class EcopontoService
             }
 
             var response = await query.Get();
-            var ecopontos = response.Models;
+            var ecopontosModel = response.Models;
 
-            if (ecopontos == null || !ecopontos.Any())
+            if (ecopontosModel == null || !ecopontosModel.Any())
             {
                 return (true, "Nenhum ecoponto encontrado", new List<EcopontoResponseDTO>());
             }
 
-            var ecopontosDTO = ecopontos.Select(e => new EcopontoResponseDTO
+            // Buscar nomes dos agentes responsáveis
+            var agentIds = ecopontosModel
+                .Where(e => e.AgenteResponsavelId.HasValue)
+                .Select(e => e.AgenteResponsavelId!.Value)
+                .Distinct()
+                .ToList();
+
+            var agentNamesMap = new Dictionary<long, string>();
+            if (agentIds.Any())
+            {
+                var agentResponse = await _supabaseClient
+                    .From<Agente>() // Usando a classe auxiliar AgenteInfo
+                    .Select("id, nome")
+                    .Filter("id", Operator.In, agentIds)
+                    .Get();
+                
+                if (agentResponse.Models != null)
+                {
+                    foreach (var agent in agentResponse.Models)
+                    {
+                        agentNamesMap[agent.Id] = agent.Nome;
+                    }
+                }
+            }
+
+            var ecopontosDTO = ecopontosModel.Select(e => new EcopontoResponseDTO
             {
                 Id = e.Id,
                 CreatedAt = e.CreatedAt,
                 Nome = e.Nome,
-                Localizacao = e.Localizacao,
+                Localizacao = e.Localizacao, // Mantido
+                Latitude = e.Latitude,     // Novo
+                Longitude = e.Longitude,   // Novo
                 Status = e.Status,
                 Capacidade = e.Capacidade,
                 PreenchidoAtual = e.PreenchidoAtual,
@@ -69,32 +110,41 @@ public class EcopontoService
                 SensorTipo = e.SensorTipo,
                 SensorTermico = e.SensorTermico,
                 SensorStatus = e.SensorStatus,
-                MaterialSuportado = e.MaterialSuportado
+                MaterialSuportado = e.MaterialSuportado,
+                NomeAgenteResponsavel = e.AgenteResponsavelId.HasValue && agentNamesMap.TryGetValue(e.AgenteResponsavelId.Value, out var nomeAgente) 
+                                        ? nomeAgente 
+                                        : null // Novo
             }).ToList();
 
-            // Se fornecidas coordenadas e raio, calcular distância
+            // Se fornecidas coordenadas e raio, calcular distância e filtrar
             if (latitude.HasValue && longitude.HasValue && raio.HasValue)
             {
                 ecopontosDTO = ecopontosDTO
-                    .Select(e =>
+                    .Select(dto =>
                     {
-                        if (e.Localizacao != null)
+                        // Priorizar as novas colunas Latitude/Longitude para cálculo de distância
+                        if (dto.Latitude.HasValue && dto.Longitude.HasValue)
                         {
-                            var coords = e.Localizacao.Split(',');
+                            dto.Distancia = CalcularDistancia(latitude.Value, longitude.Value, dto.Latitude.Value, dto.Longitude.Value);
+                        }
+                        // Fallback para Localizacao string se as colunas dedicadas não estiverem preenchidas (opcional)
+                        else if (dto.Localizacao != null) 
+                        {
+                            var coords = dto.Localizacao.Split(',');
                             if (coords.Length == 2 && 
-                                float.TryParse(coords[0], out float ecoLat) && 
-                                float.TryParse(coords[1], out float ecoLon))
+                                float.TryParse(coords[0].Trim(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out float ecoLat) && 
+                                float.TryParse(coords[1].Trim(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out float ecoLon))
                             {
-                                e.Distancia = CalcularDistancia(latitude.Value, longitude.Value, ecoLat, ecoLon);
+                                dto.Distancia = CalcularDistancia(latitude.Value, longitude.Value, ecoLat, ecoLon);
                             }
                         }
-                        return e;
+                        return dto;
                     })
-                    .Where(e => e.Distancia.HasValue && e.Distancia <= raio.Value)
-                    .OrderBy(e => e.Distancia)
+                    .Where(dto => dto.Distancia.HasValue && dto.Distancia <= raio.Value)
+                    .OrderBy(dto => dto.Distancia)
                     .ToList();
                 
-                // Aplicar paginação após o cálculo de distância
+                // Aplicar paginação APÓS o cálculo e filtro de distância
                 ecopontosDTO = ecopontosDTO
                     .Skip((pagina - 1) * limite)
                     .Take(limite)
@@ -105,7 +155,7 @@ public class EcopontoService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao listar ecopontos: {ex.Message}");
+            Console.WriteLine($"Erro ao listar ecopontos: {ex.Message} \n {ex.StackTrace}");
             return (false, "Erro ao listar ecopontos", null);
         }
     }
@@ -116,6 +166,7 @@ public class EcopontoService
         {
             var response = await _supabaseClient
                 .From<Ecoponto>()
+                .Select("id, created_at, nome, localizacao, status, capacidade, preenchido_atual, sensor_peso, sensor_tipo, sensor_termico, sensor_status, material_suportado, latitude, longitude, agente_responsavel_id")
                 .Where(e => e.Id == id)
                 .Single();
 
@@ -124,12 +175,29 @@ public class EcopontoService
                 return (false, "Ecoponto não encontrado", null);
             }
 
+            string? nomeAgenteResponsavel = null;
+            if (response.AgenteResponsavelId.HasValue)
+            {
+                 var agentResponse = await _supabaseClient
+                    .From<Agente>() // Usando a classe auxiliar AgenteInfo
+                    .Select("nome")
+                    .Filter("id", Operator.Equals, response.AgenteResponsavelId.Value)
+                    .Single(); // Usar SingleOrDefault se o agente puder não existir apesar do ID
+                
+                if (agentResponse != null)
+                {
+                    nomeAgenteResponsavel = agentResponse.Nome;
+                }
+            }
+
             var ecopontoDTO = new EcopontoResponseDTO
             {
                 Id = response.Id,
                 CreatedAt = response.CreatedAt,
                 Nome = response.Nome,
                 Localizacao = response.Localizacao,
+                Latitude = response.Latitude,
+                Longitude = response.Longitude,
                 Status = response.Status,
                 Capacidade = response.Capacidade,
                 PreenchidoAtual = response.PreenchidoAtual,
@@ -137,7 +205,8 @@ public class EcopontoService
                 SensorTipo = response.SensorTipo,
                 SensorTermico = response.SensorTermico,
                 SensorStatus = response.SensorStatus,
-                MaterialSuportado = response.MaterialSuportado
+                MaterialSuportado = response.MaterialSuportado,
+                NomeAgenteResponsavel = nomeAgenteResponsavel
             };
 
             return (true, "Ecoponto obtido com sucesso", ecopontoDTO);
@@ -165,4 +234,4 @@ public class EcopontoService
     {
         return (float)(deg * Math.PI / 180);
     }
-} 
+}
