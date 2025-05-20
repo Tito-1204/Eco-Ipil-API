@@ -121,6 +121,60 @@ public class UsuarioService
         }
     }
 
+    public async Task<(bool success, string message, string? userUid)> ValidateTokenForUid(string token)
+    {
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key não configurada")));
+
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = false,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = _configuration["Jwt:Issuer"],
+                ValidAudience = _configuration["Jwt:Audience"],
+                IssuerSigningKey = key,
+                RequireExpirationTime = false
+            };
+
+            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+
+            var userUid = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
+                        principal.FindFirst("uid")?.Value;
+
+            Console.WriteLine($"UserUid encontrado no token: {userUid}");
+
+            if (string.IsNullOrEmpty(userUid))
+            {
+                return (false, "Token inválido: UserUid não encontrado", null);
+            }
+
+            var response = await _supabaseClient
+                .From<Usuario>()
+                .Select("user_uid")
+                .Where(u => u.UserUid == userUid)
+                .Get();
+
+            var usuario = response.Models.FirstOrDefault();
+            Console.WriteLine($"Usuário encontrado: {(usuario != null ? "Sim" : "Não")}");
+
+            if (usuario == null)
+            {
+                return (false, "Usuário não encontrado", null);
+            }
+
+            return (true, "Token válido", usuario.UserUid);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao validar token para userUid: {ex.Message}");
+            return (false, $"Token inválido: {ex.Message}", null);
+        }
+    }
+
     public async Task<(bool success, string message, PerfilResponseDTO? usuario)> ObterPerfil(string token)
     {
         try
