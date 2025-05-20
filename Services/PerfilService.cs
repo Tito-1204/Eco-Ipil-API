@@ -65,6 +65,99 @@ public class PerfilService
         }
     }
 
+    // 2. Obter Total de Quilos Reciclados
+    public async Task<(bool success, string message, float totalReciclado)> ObterTotalReciclado(string token)
+    {
+        string? userUid = null;
+        try
+        {
+            var (success, message, validatedUserUid) = await ValidateTokenForUid(token);
+            userUid = validatedUserUid;
+            if (!success || userUid == null)
+            {
+                return (false, message, 0);
+            }
+
+            // Obter o ID do usuário com base no userUid
+            if (userUid == null)
+            {
+                return (false, "UserUid não pode ser nulo", 0);
+            }
+            var (userSuccess, userMessage, userId, _) = await GetUserIdFromUid(userUid!);
+            if (!userSuccess)
+            {
+                return (false, userMessage, 0);
+            }
+
+            // Converter userId para string para evitar erro de tipo no Supabase
+            var reciclagens = await _supabaseClient
+                .From<Reciclagem>()
+                .Filter("usuario_id", Operator.Equals, userId.ToString()) // Converter long para string
+                .Get();
+
+            float totalReciclado = reciclagens.Models.Sum(r => r.Peso);
+            return (true, "Total reciclado obtido com sucesso", totalReciclado);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao obter total reciclado para o usuário {UserUid}", userUid);
+            return (false, "Erro ao obter total reciclado", 0);
+        }
+    }
+
+    // 4. Contar Reciclagens e Conquistas
+    public async Task<(bool success, string message, EstatisticasDTO dados)> ObterEstatisticasUsuario(string token)
+    {
+        string? userUid = null;
+        try
+        {
+            var (success, message, validatedUserUid) = await ValidateTokenForUid(token);
+            userUid = validatedUserUid;
+            if (!success)
+            {
+                return (false, message, new EstatisticasDTO());
+            }
+
+            // Obter o ID do usuário com base no userUid
+            if (userUid == null)
+            {
+                return (false, "UserUid não pode ser nulo", new EstatisticasDTO());
+            }
+            var (userSuccess, userMessage, userId, _) = await GetUserIdFromUid(userUid);
+            if (!userSuccess)
+            {
+                return (false, userMessage, new EstatisticasDTO());
+            }
+
+            // Contar reciclagens
+            var reciclagensCount = await _supabaseClient
+                .From<Reciclagem>()
+                .Filter("usuario_id", Operator.Equals, userId.ToString()) // Converter long para string
+                .Get();
+            int totalReciclagens = reciclagensCount.Models.Count;
+
+            // Contar conquistas
+            var conquistasCount = await _supabaseClient
+                .From<ConquistasUsuarios>()
+                .Filter("usuario_id", Operator.Equals, userId.ToString()) // Converter long para string
+                .Get();
+            int totalConquistas = conquistasCount.Models.Count;
+
+            var dados = new EstatisticasDTO
+            {
+                Reciclagens = totalReciclagens,
+                Conquistas = totalConquistas
+            };
+
+            return (true, "Estatísticas obtidas com sucesso", dados);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao obter estatísticas para o usuário {UserUid}", userUid);
+            return (false, "Erro ao obter estatísticas", new EstatisticasDTO());
+        }
+    }
+
     // 1. Obter Pontos Totais Acumulados
     public async Task<(bool success, string message, long pontosTotais)> ObterPontosTotais(string token)
     {
@@ -94,46 +187,6 @@ public class PerfilService
         {
             _logger.LogError(ex, "Erro ao obter pontos totais para o usuário {UserUid}", userUid);
             return (false, "Erro ao obter pontos totais", 0);
-        }
-    }
-
-    // 2. Obter Total de Quilos Reciclados
-    public async Task<(bool success, string message, float totalReciclado)> ObterTotalReciclado(string token)
-    {
-        string? userUid = null;
-        try
-        {
-            var (success, message, validatedUserUid) = await ValidateTokenForUid(token);
-            userUid = validatedUserUid;
-            if (!success)
-            {
-                return (false, message, 0);
-            }
-
-            // Obter o ID do usuário com base no userUid
-            if (userUid == null)
-            {
-                return (false, "UserUid não pode ser nulo", 0);
-            }
-            
-            var (userSuccess, userMessage, userId, _) = await GetUserIdFromUid(userUid);
-            if (!userSuccess)
-            {
-                return (false, userMessage, 0);
-            }
-
-            var reciclagens = await _supabaseClient
-                .From<Reciclagem>()
-                .Filter("usuario_id", Operator.Equals, userId)
-                .Get();
-
-            float totalReciclado = reciclagens.Models.Sum(r => r.Peso);
-            return (true, "Total reciclado obtido com sucesso", totalReciclado);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Erro ao obter total reciclado para o usuário {UserUid}", userUid);
-            return (false, "Erro ao obter total reciclado", 0);
         }
     }
 
@@ -200,55 +253,6 @@ public class PerfilService
         {
             _logger.LogError(ex, "Erro ao calcular CO2 evitado para o usuário {UserUid}", userUid);
             return (false, "Erro ao calcular CO2 evitado", 0);
-        }
-    }
-
-    // 4. Contar Reciclagens e Conquistas
-    public async Task<(bool success, string message, EstatisticasDTO dados)> ObterEstatisticasUsuario(string token)
-    {
-        string? userUid = null;
-        try
-        {
-            var (success, message, validatedUserUid) = await ValidateTokenForUid(token);
-            userUid = validatedUserUid;
-            if (!success || userUid == null)
-            {
-                return (false, message, new EstatisticasDTO());
-            }
-
-            // Obter o ID do usuário com base no userUid
-            var (userSuccess, userMessage, userId, _) = await GetUserIdFromUid(userUid);
-            if (!userSuccess)
-            {
-                return (false, userMessage, new EstatisticasDTO());
-            }
-
-            // Contar reciclagens
-            var reciclagensCount = await _supabaseClient
-                .From<Reciclagem>()
-                .Filter("usuario_id", Operator.Equals, userId)
-                .Get();
-            int totalReciclagens = reciclagensCount.Models.Count;
-
-            // Contar conquistas
-            var conquistasCount = await _supabaseClient
-                .From<ConquistasUsuarios>()
-                .Filter("usuario_id", Operator.Equals, userId)
-                .Get();
-            int totalConquistas = conquistasCount.Models.Count;
-
-            var dados = new EstatisticasDTO
-            {
-                Reciclagens = totalReciclagens,
-                Conquistas = totalConquistas
-            };
-
-            return (true, "Estatísticas obtidas com sucesso", dados);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Erro ao obter estatísticas para o usuário {UserUid}", userUid);
-            return (false, "Erro ao obter estatísticas", new EstatisticasDTO());
         }
     }
 

@@ -414,15 +414,19 @@ public class HistoricoService
         }
     }
 
- // 1. Obter Materiais Reciclados (para gráfico)
+    // 1. Obter Materiais Reciclados (para gráfico)
     public async Task<(bool success, string message, List<MaterialRecicladoDTO> dados)> ObterMateriaisReciclados(string token)
     {
-        string? userUid = null;
+        string userUid = string.Empty;
         try
         {
             var (success, message, validatedUserUid) = await ValidateTokenForUid(token);
+            if (validatedUserUid == null)
+            {
+                return (false, "User ID não encontrado", new List<MaterialRecicladoDTO>());
+            }
             userUid = validatedUserUid;
-            if (!success || userUid == null)
+            if (!success)
             {
                 return (false, message, new List<MaterialRecicladoDTO>());
             }
@@ -437,7 +441,7 @@ public class HistoricoService
             // Buscar todas as reciclagens do usuário
             var reciclagensResponse = await _supabaseClient
                 .From<Reciclagem>()
-                .Filter("usuario_id", Operator.Equals, userId)
+                .Filter("usuario_id", Operator.Equals, userId.ToString()) // Converter long para string
                 .Get();
 
             var reciclagens = reciclagensResponse.Models;
@@ -450,7 +454,7 @@ public class HistoricoService
             var materialIds = reciclagens.Select(r => r.MaterialId).Distinct().ToList();
             var materiaisResponse = await _supabaseClient
                 .From<Material>()
-                .Filter("id", Operator.In, materialIds)
+                .Filter("id", Operator.In, materialIds.Select(id => id.ToString()).ToList()) // Converter cada ID para string
                 .Get();
 
             var materiais = materiaisResponse.Models?.ToDictionary(m => m.Id, m => m.Nome) ?? new Dictionary<long, string>();
@@ -481,11 +485,12 @@ public class HistoricoService
         try
         {
             var (success, message, validatedUserUid) = await ValidateTokenForUid(token);
-            userUid = validatedUserUid;
-            if (!success || userUid == null)
+            if (!success || validatedUserUid == null)
             {
                 return (false, message, new List<ReciclagemMensalDTO>());
             }
+
+            userUid = validatedUserUid;
 
             // Obter o ID do usuário com base no userUid
             var (userSuccess, userMessage, userId, _) = await GetUserIdFromUid(userUid);
@@ -500,7 +505,7 @@ public class HistoricoService
             // Buscar reciclagens dos últimos 6 meses
             var reciclagensResponse = await _supabaseClient
                 .From<Reciclagem>()
-                .Filter("usuario_id", Operator.Equals, userId)
+                .Filter("usuario_id", Operator.Equals, userId.ToString()) // Converter long para string
                 .Filter("created_at", Operator.GreaterThanOrEqual, dataInicio.ToString("o"))
                 .Get();
 
