@@ -59,7 +59,7 @@ public class TicketService
             }
             long userId = validationResult.userId;
 
-            if (ticketDTO.TipoOperacao != "LevantamentoExpress" && ticketDTO.TipoOperacao != "PagamentoMao")
+            if (ticketDTO.TipoOperacao != "LevantamentoExpress" && ticketDTO.TipoOperacao != "PagamentoMao" && ticketDTO.TipoOperacao != "ResgateRecompensa")
             {
                 return (false, "Tipo de operação inválido. Use 'LevantamentoExpress' ou 'PagamentoMao'.", null);
             }
