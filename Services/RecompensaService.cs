@@ -270,7 +270,7 @@ public class RecompensaService
                 Token = token,
                 TipoOperacao = "ResgateRecompensa",
                 Descricao = $"Resgate da recompensa: {recompensa.Nome} (ID: {recompensa.Id})",
-                Valor = 0.124 // Não envolve saldo, apenas pontos
+                Valor = 1 // Não envolve saldo, apenas pontos
             };
 
             var ticketResult = await _ticketService.CriarTicket(ticketDTO);
