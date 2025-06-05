@@ -64,7 +64,7 @@ public class TicketService
                 return (false, "Tipo de operação inválido. Use 'LevantamentoExpress' ou 'PagamentoMao'.", null);
             }
 
-            if (ticketDTO.Valor <= 0)
+            if (ticketDTO.Valor <= 0 && ticketDTO.TipoOperacao != "ResgateRecompensa")
             {
                 return (false, "O valor deve ser maior que zero.", null);
             }
