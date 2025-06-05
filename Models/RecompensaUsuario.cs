@@ -23,6 +23,4 @@ public class RecompensaUsuario : BaseModel
 
     [Column("ticket_code")]
     public string? TicketCode { get; set; }
-
-    public Recompensa? Recompensa { get; set; }
 }
