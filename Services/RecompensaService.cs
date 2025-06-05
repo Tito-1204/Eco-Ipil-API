@@ -17,15 +17,21 @@ public class RecompensaService
     private readonly Supabase.Client _supabaseClient;
     private readonly UsuarioService _usuarioService;
     private readonly CarteiraService _carteiraService;
+    private readonly TicketService _ticketService;
+    private readonly NotificacaoService _notificacaoService;
 
     public RecompensaService(
         SupabaseService supabaseService,
         UsuarioService usuarioService,
-        CarteiraService carteiraService)
+        CarteiraService carteiraService,
+        TicketService ticketService,
+        NotificacaoService notificacaoService)
     {
         _supabaseClient = supabaseService.GetClient();
         _usuarioService = usuarioService;
         _carteiraService = carteiraService;
+        _ticketService = ticketService;
+        _notificacaoService = notificacaoService;
     }
 
     /// <summary>
@@ -203,13 +209,12 @@ public class RecompensaService
     /// <summary>
     /// Resgata uma recompensa para o usuário
     /// </summary>
-    public async Task<(bool success, string message, object? data)> ResgatarRecompensa(
+   public async Task<(bool success, string message, RecompensaResgateResponseDTO? data)> ResgatarRecompensa(
         string token,
         long recompensaId)
     {
         try
         {
-            // Validar o token
             var validationResult = await _usuarioService.ValidateToken(token);
             if (!validationResult.success)
             {
@@ -218,7 +223,6 @@ public class RecompensaService
 
             long userId = validationResult.userId;
 
-            // Verificar se a recompensa existe e tem estoque
             var recompensa = await _supabaseClient
                 .From<Recompensa>()
                 .Where(r => r.Id == recompensaId)
@@ -234,7 +238,6 @@ public class RecompensaService
                 return (false, "Esta recompensa não está mais disponível (estoque esgotado)", null);
             }
 
-            // Obter a carteira do usuário para verificar os pontos
             var carteiraResult = await _carteiraService.ObterCarteira(token);
             if (!carteiraResult.success || carteiraResult.carteira == null)
             {
@@ -247,10 +250,6 @@ public class RecompensaService
                 return (false, $"Pontos insuficientes. Você possui {carteira.Pontos} pontos, mas precisa de {recompensa.Pontos} pontos.", null);
             }
 
-            // Iniciar uma transação (idealmente, mas não temos suporte direto do Supabase para isso)
-            // Então vamos fazer uma série de operações em sequência
-
-            // 1. Debitar os pontos da carteira do usuário
             var carteiraAtual = await _supabaseClient
                 .From<CarteiraDigital>()
                 .Where(c => c.UsuarioId == userId)
@@ -261,72 +260,77 @@ public class RecompensaService
                 return (false, "Carteira digital não encontrada", null);
             }
 
-            // Atualizar o saldo de pontos
+            // Deduzir os pontos
             carteiraAtual.Pontos -= recompensa.Pontos;
             await _supabaseClient.From<CarteiraDigital>().Update(carteiraAtual);
 
-            // 2. Diminuir o estoque da recompensa
-            recompensa.QtRestante -= 1;
-            await _supabaseClient.From<Recompensa>().Update(recompensa);
-
-            // 3. Registrar o resgate na tabela associativa
-            try
+            // Gerar um ticket para rastrear o resgate
+            var ticketDTO = new TicketCreateDTO
             {
-                Console.WriteLine($"Tentando criar registro na tabela recompensas_usuarios: RecompensaId={recompensaId}, UsuarioId={userId}, DataRecompensa={DateTime.UtcNow}");
-                
-                var recompensaUsuario = new RecompensaUsuario
-                {
-                    RecompensaId = recompensaId,
-                    UsuarioId = userId,
-                    DataRecompensa = DateTime.UtcNow
-                };
+                Token = token,
+                TipoOperacao = "ResgateRecompensa",
+                Descricao = $"Resgate da recompensa: {recompensa.Nome} (ID: {recompensa.Id})",
+                Valor = 0 // Não envolve saldo, apenas pontos
+            };
 
-                // Verificar se os valores são válidos antes de inserir
-                if (recompensaId <= 0 || userId <= 0)
-                {
-                    return (false, $"Valores inválidos: RecompensaId={recompensaId}, UsuarioId={userId}", null);
-                }
-
-                // Inserir o registro usando a tabela correta e garantindo os campos corretamente
-                var insertResponse = await _supabaseClient
-                    .From<RecompensaUsuario>()
-                    .Insert(recompensaUsuario);
-
-                // Verificar se a inserção foi bem-sucedida
-                if (insertResponse == null || !insertResponse.Models.Any())
-                {
-                    return (false, "Falha ao registrar a recompensa na conta do usuário", null);
-                }
-
-                Console.WriteLine("Registro criado com sucesso na tabela recompensas_usuarios");
-            }
-            catch (Exception ex)
+            var ticketResult = await _ticketService.CriarTicket(ticketDTO);
+            if (!ticketResult.success)
             {
-                // Reverter operações anteriores
                 carteiraAtual.Pontos += recompensa.Pontos;
                 await _supabaseClient.From<CarteiraDigital>().Update(carteiraAtual);
-                
-                recompensa.QtRestante += 1;
-                await _supabaseClient.From<Recompensa>().Update(recompensa);
-                
-                Console.WriteLine($"Erro ao registrar na tabela recompensas_usuarios: {ex.Message}");
-                return (false, $"Erro ao registrar o resgate da recompensa: {ex.Message}", null);
+                return (false, $"Falha ao gerar ticket para o resgate: {ticketResult.message}", null);
             }
 
-            // 4. Preparar a resposta com os detalhes do resgate
-            var recompensaResgatada = new RecompensaUsuarioResponseDTO
+            // Registrar o resgate com status "Pendente" e associar o TicketCode
+            var recompensaUsuario = new RecompensaUsuario
             {
-                Id = recompensa.Id,
+                RecompensaId = recompensaId,
+                UsuarioId = userId,
+                DataRecompensa = DateTime.UtcNow,
+                Status = "Pendente",
+                TicketCode = ticketResult.ticket != null ? ticketResult.ticket.TicketCode : string.Empty
+            };
+
+            var insertResponse = await _supabaseClient
+                .From<RecompensaUsuario>()
+                .Insert(recompensaUsuario);
+
+            if (insertResponse == null || !insertResponse.Models.Any())
+            {
+                carteiraAtual.Pontos += recompensa.Pontos;
+                await _supabaseClient.From<CarteiraDigital>().Update(carteiraAtual);
+                if (ticketResult.ticket != null)
+                {
+                    await _supabaseClient.From<Ticket>()
+                        .Where(t => t.Id == ticketResult.ticket.Id)
+                        .Delete();
+                }
+                return (false, "Falha ao registrar a recompensa na conta do usuário", null);
+            }
+
+            // Enviar notificação ao usuário sobre o resgate solicitado
+            var notificacaoSolicitada = $"Você solicitou o resgate da recompensa '{recompensa.Nome}'. Seu TicketCode é {ticketResult.ticket?.TicketCode ?? "N/A"}. Um administrador entrará em contato em breve.";
+            await _notificacaoService.CriarNotificacaoPessoal(
+                usuarioId: userId,
+                mensagem: notificacaoSolicitada,
+                tipo: "Resgate de Recompensa Solicitado",
+                dataExpiracao: DateTime.UtcNow.AddDays(7)
+            );
+
+            // Preparar a resposta
+            var resgateResponse = new RecompensaResgateResponseDTO
+            {
+                RecompensaId = recompensa.Id,
                 Nome = recompensa.Nome,
                 Tipo = recompensa.Tipo,
                 Descricao = recompensa.Descricao,
                 Pontos = recompensa.Pontos,
                 DataResgate = DateTime.UtcNow,
-                Status = "Resgatada"
+                Status = "Pendente",
+                TicketCode = ticketResult.ticket?.TicketCode ?? "N/A"
             };
 
-            // Retornar sucesso com os dados da recompensa resgatada
-            return (true, "Recompensa resgatada com sucesso", recompensaResgatada);
+            return (true, "Resgate solicitado com sucesso. Um administrador entrará em contato em breve.", resgateResponse);
         }
         catch (Exception ex)
         {

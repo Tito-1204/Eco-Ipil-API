@@ -37,7 +37,6 @@ public class RecompensasController : ControllerBase
     {
         try
         {
-            // Converter os valores string para long?
             long? precoMinValue = null;
             if (!string.IsNullOrEmpty(precoMin) && long.TryParse(precoMin, out long minValue))
             {
@@ -139,7 +138,7 @@ public class RecompensasController : ControllerBase
             {
                 status = true,
                 message,
-                data
+                data = data as RecompensaResgateResponseDTO
             });
         }
         else
@@ -185,4 +184,4 @@ public class RecompensasController : ControllerBase
             });
         }
     }
-} 
+}

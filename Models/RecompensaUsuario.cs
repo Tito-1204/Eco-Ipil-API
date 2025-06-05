@@ -18,5 +18,11 @@ public class RecompensaUsuario : BaseModel
     [Column("data_recompensa")]
     public DateTime DataRecompensa { get; set; }
 
+    [Column("status")]
+    public string? Status { get; set; }
+
+    [Column("ticket_code")]
+    public string? TicketCode { get; set; }
+
     public Recompensa? Recompensa { get; set; }
-} 
+}
