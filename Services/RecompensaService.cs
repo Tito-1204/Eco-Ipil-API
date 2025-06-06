@@ -342,7 +342,7 @@ public class RecompensaService
     /// <summary>
     /// Lista as recompensas resgatadas pelo usuário
     /// </summary>
-    public async Task<(bool success, string message, List<RecompensaUsuarioResponseDTO>? recompensas)> ListarRecompensasUsuario(
+       public async Task<(bool success, string message, List<RecompensaUsuarioResponseDTO>? recompensas)> ListarRecompensasUsuario(
         string token,
         string? status = null)
     {
@@ -361,6 +361,12 @@ public class RecompensaService
             var query = _supabaseClient
                 .From<RecompensaUsuario>()
                 .Where(ru => ru.UsuarioId == userId);
+
+            // Aplicar filtro por status, se fornecido
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Filter("status", Operator.Equals, status);
+            }
 
             var recompensasUsuario = await query.Get();
 
@@ -388,14 +394,11 @@ public class RecompensaService
                         Descricao = recompensa.Descricao,
                         Pontos = recompensa.Pontos,
                         DataResgate = ru.DataRecompensa,
-                        Status = "Resgatada" // Poderia ter lógica para diferenciar status
+                        Status = ru.Status ?? "Desconhecido", // Usar o status real da tabela, ou "Desconhecido" se for nulo
+                        TicketCode = ru.TicketCode // Incluir o TicketCode
                     };
 
-                    // Aplicar filtro por status, se fornecido
-                    if (string.IsNullOrEmpty(status) || dto.Status.Equals(status, StringComparison.OrdinalIgnoreCase))
-                    {
-                        recompensasDTO.Add(dto);
-                    }
+                    recompensasDTO.Add(dto);
                 }
             }
 
