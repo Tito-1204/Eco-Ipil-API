@@ -7,8 +7,9 @@ public class InvestimentoResponseDTO
     public long TotalInvestido { get; set; }
     public string Tipo { get; set; } = string.Empty;
     public long Meta { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public long PontosInvestidos { get; set; } // Adicionado
-    public DateTime DataRetorno { get; set; } // Adicionado
-    public long ValorRetorno { get; set; } // Adicionado
+    public string Status { get; set; } = "Ativo";
+    public long? PontosInvestidos { get; set; }
+    public DateTime? DataRetorno { get; set; }
+    public long? ValorRetorno { get; set; }
+    public string Descricao { get; set; } = string.Empty; // Adicionado
 }

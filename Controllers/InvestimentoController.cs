@@ -44,7 +44,8 @@ public class InvestimentoController : ControllerBase
                 TotalInvestido = i.TotalInvestido,
                 Tipo = i.Tipo,
                 Meta = i.Meta,
-                Status = i.Status
+                Status = i.Status,
+                Descricao = i.Descricao // Adicionado
             }).ToList();
 
             return Ok(new
@@ -93,7 +94,8 @@ public class InvestimentoController : ControllerBase
                 TotalInvestido = investment.TotalInvestido,
                 Tipo = investment.Tipo,
                 Meta = investment.Meta,
-                Status = investment.Status
+                Status = investment.Status,
+                Descricao = investment.Descricao // Adicionado
             };
 
             return Ok(new
@@ -128,7 +130,7 @@ public class InvestimentoController : ControllerBase
             }
 
             // Buscar os registros de investimentos do usuário na tabela 'investir'
-            var client = _supabaseService.GetClient(); // Usando SupabaseService diretamente
+            var client = _supabaseService.GetClient();
             var userInvestments = await client.From<Investir>()
                 .Where(i => i.UsuarioId == userId)
                 .Get();
@@ -160,7 +162,8 @@ public class InvestimentoController : ControllerBase
                         Status = investment.Status,
                         PontosInvestidos = investir.PontosInvestidos,
                         DataRetorno = investir.DataRetorno,
-                        ValorRetorno = (long)investir.ValorRetorno
+                        ValorRetorno = (long)investir.ValorRetorno,
+                        Descricao = investment.Descricao // Adicionado
                     });
                 }
             }

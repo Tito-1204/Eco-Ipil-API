@@ -34,7 +34,7 @@ public class InvestimentoService
     {
         var client = _supabaseService.GetClient();
         var response = await client.From<Investimento>()
-            .Filter("id", Operator.Equals, id)
+            .Filter("id", Operator.Equals, id.ToString()) // Convertendo id para string
             .Get();
         var investimento = response.Models.FirstOrDefault();
         return investimento ?? new Investimento { Id = id };
