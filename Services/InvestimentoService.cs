@@ -27,7 +27,9 @@ public class InvestimentoService
         var response = await client.From<Investimento>()
             .Filter("status", Operator.Equals, "Ativo")
             .Get();
-        return response.Models;
+        var investments = response.Models;
+        _logger.LogInformation("Recuperados {Count} investimentos ativos", investments.Count);
+        return investments;
     }
 
     public async Task<Investimento> GetInvestmentById(long id)
@@ -37,7 +39,12 @@ public class InvestimentoService
             .Filter("id", Operator.Equals, id.ToString()) // Convertendo id para string
             .Get();
         var investimento = response.Models.FirstOrDefault();
-        return investimento ?? new Investimento { Id = id };
+        if (investimento == null)
+        {
+            _logger.LogWarning("Investimento com ID {InvestmentId} não encontrado", id);
+            return null;
+        }
+        return investimento;
     }
 
     public async Task UpdateInvestmentStatus(long investimentoId)

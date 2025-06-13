@@ -45,7 +45,7 @@ public class InvestimentoController : ControllerBase
                 Tipo = i.Tipo,
                 Meta = i.Meta,
                 Status = i.Status,
-                Descricao = i.Descricao // Adicionado
+                Descricao = i.Descricao
             }).ToList();
 
             return Ok(new
@@ -95,7 +95,7 @@ public class InvestimentoController : ControllerBase
                 Tipo = investment.Tipo,
                 Meta = investment.Meta,
                 Status = investment.Status,
-                Descricao = investment.Descricao // Adicionado
+                Descricao = investment.Descricao
             };
 
             return Ok(new
@@ -146,13 +146,13 @@ public class InvestimentoController : ControllerBase
             }
 
             // Buscar os detalhes de cada investimento associado
-            var investmentDetails = new List<InvestimentoResponseDTO>();
+            var investmentDetails = new List<UserInvestmentResponseDTO>();
             foreach (var investir in userInvestments.Models)
             {
                 var investment = await _investimentoService.GetInvestmentById(investir.InvestimentoId);
                 if (investment != null)
                 {
-                    investmentDetails.Add(new InvestimentoResponseDTO
+                    investmentDetails.Add(new UserInvestmentResponseDTO
                     {
                         Id = investment.Id,
                         Nome = investment.Nome,
@@ -162,8 +162,8 @@ public class InvestimentoController : ControllerBase
                         Status = investment.Status,
                         PontosInvestidos = investir.PontosInvestidos,
                         DataRetorno = investir.DataRetorno,
-                        ValorRetorno = (long)investir.ValorRetorno,
-                        Descricao = investment.Descricao // Adicionado
+                        ValorRetorno = (long?)investir.ValorRetorno,
+                        Descricao = investment.Descricao
                     });
                 }
             }

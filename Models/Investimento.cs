@@ -23,11 +23,11 @@ public class Investimento : BaseModel
     public string Tipo { get; set; } = string.Empty;
 
     [Column("meta")]
-    public long Meta { get; set; }
+    public double Meta { get; set; } // Alterado de long para double
 
     [Column("status")]
     public string Status { get; set; } = "Ativo";
 
     [Column("descricao")]
-    public string Descricao { get; set; } = string.Empty; // Adicionado
+    public string Descricao { get; set; } = string.Empty;
 }
