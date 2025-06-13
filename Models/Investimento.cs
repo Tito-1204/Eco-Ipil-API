@@ -27,4 +27,7 @@ public class Investimento : BaseModel
 
     [Column("status")]
     public string Status { get; set; } = "Ativo";
+
+    [Column("descricao")]
+    public string Descricao { get; set; } = string.Empty; // Adicionado
 }
