@@ -6,9 +6,9 @@ public class InvestimentoResponseDTO
     public string Nome { get; set; } = string.Empty;
     public long TotalInvestido { get; set; }
     public string Tipo { get; set; } = string.Empty;
-    public long Meta { get; set; }
+    public double Meta { get; set; } // Alterado de long para double
     public string Status { get; set; } = "Ativo";
-    public string Descricao { get; set; } = string.Empty; // Apenas dados da tabela investimentos
+    public string Descricao { get; set; } = string.Empty;
 }
 
 public class UserInvestmentResponseDTO
@@ -17,10 +17,10 @@ public class UserInvestmentResponseDTO
     public string Nome { get; set; } = string.Empty;
     public long TotalInvestido { get; set; }
     public string Tipo { get; set; } = string.Empty;
-    public long Meta { get; set; }
+    public double Meta { get; set; } // Alterado de long para double
     public string Status { get; set; } = "Ativo";
     public long? PontosInvestidos { get; set; }
     public DateTime? DataRetorno { get; set; }
     public long? ValorRetorno { get; set; }
-    public string Descricao { get; set; } = string.Empty; // Dados combinados de investimentos e investir
+    public string Descricao { get; set; } = string.Empty;
 }

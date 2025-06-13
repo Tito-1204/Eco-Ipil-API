@@ -32,7 +32,7 @@ public class InvestimentoService
         return investments;
     }
 
-    public async Task<Investimento> GetInvestmentById(long id)
+    public async Task<Investimento?> GetInvestmentById(long id) // Alterado para Investimento?
     {
         var client = _supabaseService.GetClient();
         var response = await client.From<Investimento>()
@@ -42,9 +42,8 @@ public class InvestimentoService
         if (investimento == null)
         {
             _logger.LogWarning("Investimento com ID {InvestmentId} não encontrado", id);
-            return null;
         }
-        return investimento;
+        return investimento; // Retorna null se não encontrado
     }
 
     public async Task UpdateInvestmentStatus(long investimentoId)

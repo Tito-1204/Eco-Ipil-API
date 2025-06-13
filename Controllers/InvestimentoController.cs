@@ -43,7 +43,7 @@ public class InvestimentoController : ControllerBase
                 Nome = i.Nome,
                 TotalInvestido = i.TotalInvestido,
                 Tipo = i.Tipo,
-                Meta = i.Meta,
+                Meta = (long)i.Meta, // Cast explícito de double para long
                 Status = i.Status,
                 Descricao = i.Descricao
             }).ToList();
@@ -93,7 +93,7 @@ public class InvestimentoController : ControllerBase
                 Nome = investment.Nome,
                 TotalInvestido = investment.TotalInvestido,
                 Tipo = investment.Tipo,
-                Meta = investment.Meta,
+                Meta = (long)investment.Meta, // Cast explícito de double para long
                 Status = investment.Status,
                 Descricao = investment.Descricao
             };
@@ -158,7 +158,7 @@ public class InvestimentoController : ControllerBase
                         Nome = investment.Nome,
                         TotalInvestido = investment.TotalInvestido,
                         Tipo = investment.Tipo,
-                        Meta = investment.Meta,
+                        Meta = (long)investment.Meta, // Cast explícito de double para long
                         Status = investment.Status,
                         PontosInvestidos = investir.PontosInvestidos,
                         DataRetorno = investir.DataRetorno,
