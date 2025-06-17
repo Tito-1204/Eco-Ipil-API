@@ -34,45 +34,8 @@ public class TicketService
         _authService = authService;
     }
     
-    private async Task<long?> GetNumericUserIdFromToken(string? token)
-    {
-        if (string.IsNullOrEmpty(token))
-        {
-            _logger.LogWarning("GetNumericUserIdFromToken foi chamado com token nulo ou vazio.");
-            return null;
-        }
-
-        var userUid = _authService.ObterIdDoToken(token);
-        if (userUid == null)
-        {
-            _logger.LogWarning("AuthService.ObterIdDoToken retornou nulo para o token fornecido.");
-            return null;
-        }
-        
-        try
-        {
-            var parameters = new Dictionary<string, object> { { "p_user_uid", userUid } };
-            
-            // CORREÇÃO: Acessar o resultado diretamente, pois ele já é do tipo `long?`
-            var userId = await _supabaseClient.Rpc<long?>("get_user_id_by_uid", parameters);
-            
-            if (userId.HasValue && userId.Value > 0)
-            {
-                _logger.LogInformation("RPC get_user_id_by_uid retornou o ID: {UserId} para o UID: {UserUid}", userId.Value, userUid);
-                return userId.Value;
-            }
-            else
-            {
-                _logger.LogWarning("RPC get_user_id_by_uid não retornou um ID válido para o UID: {UserUid}", userUid);
-                return null;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Exceção ao chamar a função RPC get_user_id_by_uid para o UID: {userUid}", userUid);
-            return null;
-        }
-    }
+    // Este método não é mais necessário pois a lógica foi movida para AuthService
+    // private async Task<long?> GetNumericUserIdFromToken(string? token) { ... }
 
 
     private string GenerateTicketCode()
@@ -87,7 +50,7 @@ public class TicketService
     {
         try
         {
-            var userId = await GetNumericUserIdFromToken(ticketDTO.Token);
+            var userId = _authService.ObterIdDoToken(ticketDTO.Token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);
@@ -170,7 +133,7 @@ public class TicketService
     {
         try
         {
-            var userId = await GetNumericUserIdFromToken(token);
+            var userId = _authService.ObterIdDoToken(token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);
@@ -236,7 +199,7 @@ public class TicketService
     {
         try
         {
-            var userId = await GetNumericUserIdFromToken(token);
+            var userId = _authService.ObterIdDoToken(token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);
@@ -277,7 +240,7 @@ public class TicketService
     {
         try
         {
-            var userId = await GetNumericUserIdFromToken(token);
+            var userId = _authService.ObterIdDoToken(token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);

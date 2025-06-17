@@ -201,7 +201,7 @@ public class UsuariosController : ControllerBase
 
                 await _supabaseClient.From<Usuario>().Insert(novoUsuario);
 
-                var token = _authService.GerarToken(novoUsuario.UserUid, novoUsuario.Email, true);
+                var token = _authService.GerarToken(novoUsuario); // CORREÇÃO: Passando o objeto
                 _logger.LogInformation("Novo usuário criado: {UserId}, Email: {Email}", novoUsuario.Id, novoUsuario.Email);
                 return Ok(new
                 {
@@ -218,7 +218,7 @@ public class UsuariosController : ControllerBase
                 usuarioExistente.UltimoLogin = DateTime.UtcNow;
                 await _supabaseClient.From<Usuario>().Update(usuarioExistente);
 
-                var token = _authService.GerarToken(usuarioExistente.UserUid, usuarioExistente.Email, true);
+                var token = _authService.GerarToken(usuarioExistente); // CORREÇÃO: Passando o objeto
                 _logger.LogInformation("Login realizado com sucesso para usuário: {UserId}, Email: {Email}", usuarioExistente.Id, usuarioExistente.Email);
                 return Ok(new
                 {
@@ -277,7 +277,7 @@ public class UsuariosController : ControllerBase
 
             await _supabaseClient.From<Usuario>().Update(usuario);
 
-            var token = _authService.GerarToken(usuario.UserUid, usuario.Email, true);
+            var token = _authService.GerarToken(usuario); // CORREÇÃO: Passando o objeto
             _logger.LogInformation("Perfil completado com sucesso para usuário: {UserId}", userId);
             return Ok(new
             {

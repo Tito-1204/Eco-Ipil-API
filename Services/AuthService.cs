@@ -103,9 +103,7 @@ namespace EcoIpil.API.Services
                     Console.WriteLine($"Erro ao atualizar último login: {updateEx.Message}");
                 }
 
-                userId = string.IsNullOrEmpty(usuario.UserUid) ? "00000000-0000-0000-0000-000000000000" : usuario.UserUid;
-
-                var token = GerarToken(userId, usuario.Email, loginDto.ManterConectado);
+                var token = GerarToken(usuario); // Passando o objeto usuário inteiro
                 return (true, "Login realizado com sucesso", token);
             }
             catch (Exception ex)
@@ -296,14 +294,13 @@ namespace EcoIpil.API.Services
             }
         }
 
-        public string GerarToken(string userId, string email, bool manterConectado)
+        public string GerarToken(Usuario usuario)
         {
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, userId),
-                new Claim(ClaimTypes.Email, email),
-                new Claim("uid", userId),
-                new Claim("email", email.ToLower())
+                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()), // Armazena o ID numérico
+                new Claim(ClaimTypes.Email, usuario.Email ?? ""),
+                new Claim("uid", usuario.UserUid ?? "") // Mantém o UID para referência, se necessário
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key não configurada")));
@@ -323,48 +320,39 @@ namespace EcoIpil.API.Services
 
         public long? ObterIdDoToken(string token)
         {
+            if (string.IsNullOrEmpty(token))
+            {
+                return null;
+            }
+
             try
             {
                 var tokenHandler = new JwtSecurityTokenHandler();
                 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key não configurada")));
+                
                 var validationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
                     ValidateAudience = true,
-                    ValidateLifetime = false,
+                    ValidateLifetime = false, // Em desenvolvimento; defina como true em produção
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = _configuration["Jwt:Issuer"],
                     ValidAudience = _configuration["Jwt:Audience"],
                     IssuerSigningKey = key,
-                    RequireExpirationTime = false
+                    RequireExpirationTime = false // Em desenvolvimento; defina como true em produção
                 };
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
-                var userUid = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
-                             principal.FindFirst("uid")?.Value;
+                
+                // Extrai o ID numérico diretamente do claim principal (NameIdentifier)
+                var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-                if (string.IsNullOrEmpty(userUid))
+                if (long.TryParse(userIdClaim, out long userId))
                 {
-                    Console.WriteLine("Token inválido: UserUid não encontrado");
-                    return null;
+                    return userId;
                 }
 
-                var client = _supabaseService.GetClient();
-                var response = client.From<Usuario>()
-                    .Select("id, user_uid")
-                    .Where(u => u.UserUid == userUid)
-                    .Get()
-                    .GetAwaiter()
-                    .GetResult();
-
-                var usuario = response.Models.FirstOrDefault();
-                if (usuario == null)
-                {
-                    Console.WriteLine("Usuário não encontrado");
-                    return null;
-                }
-
-                return usuario.Id;
+                return null;
             }
             catch (Exception ex)
             {
