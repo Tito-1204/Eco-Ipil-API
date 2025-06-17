@@ -1,3 +1,5 @@
+using System;
+
 namespace EcoIpil.API.DTOs;
 
 public class TicketResponseDTO

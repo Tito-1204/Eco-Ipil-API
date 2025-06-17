@@ -1,12 +1,14 @@
 using Supabase.Postgrest.Attributes;
 using Supabase.Postgrest.Models;
+using System;
+using System.Collections.Generic;
 
 namespace EcoIpil.API.Models;
 
 [Table("tickets")]
 public class Ticket : BaseModel
 {
-    [PrimaryKey("id", false)]
+    [PrimaryKey("id", shouldInsert: false)]
     public long Id { get; set; }
 
     [Column("created_at")]
@@ -31,5 +33,5 @@ public class Ticket : BaseModel
     public string? TicketCode { get; set; }
 
     [Column("usuario_id")]
-    public long? UsuarioId { get; set; }
+    public long UsuarioId { get; set; }
 }

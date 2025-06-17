@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace EcoIpil.API.DTOs;
 
 public class TicketListResponseDTO
@@ -8,7 +10,7 @@ public class TicketListResponseDTO
 
 public class PaginationMeta
 {
-    public int Total { get; set; }
+    public long Total { get; set; }
     public int Pagina { get; set; }
     public int Limite { get; set; }
     public int Paginas { get; set; }
