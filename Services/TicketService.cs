@@ -46,11 +46,13 @@ public class TicketService
     {
         try
         {
-            var userId = await _authService.ObterIdDoToken(ticketDTO.Token);
-            if (userId == null)
+            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
+            var validationResult = await _usuarioService.ValidateToken(ticketDTO.Token);
+            if (!validationResult.success)
             {
-                return (false, "Token inválido ou usuário não encontrado.", null);
+                return (false, validationResult.message, null);
             }
+            long userId = validationResult.userId;
 
             if (ticketDTO.TipoOperacao != "LevantamentoExpress" && ticketDTO.TipoOperacao != "PagamentoMao" && ticketDTO.TipoOperacao != "ResgateRecompensa")
             {
@@ -64,7 +66,7 @@ public class TicketService
 
             var carteira = await _supabaseClient
                 .From<CarteiraDigital>()
-                .Where(c => c.UsuarioId == userId.Value)
+                .Where(c => c.UsuarioId == userId)
                 .Single();
 
             if (carteira == null)
@@ -82,7 +84,7 @@ public class TicketService
 
             var ticket = new Ticket
             {
-                UsuarioId = userId.Value,
+                UsuarioId = userId,
                 TicketCode = GenerateTicketCode(),
                 TipoOperacao = ticketDTO.TipoOperacao,
                 Descricao = ticketDTO.Descricao,
@@ -129,15 +131,17 @@ public class TicketService
     {
         try
         {
-            var userId = await _authService.ObterIdDoToken(token);
-            if (userId == null)
+            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
+            var validationResult = await _usuarioService.ValidateToken(token);
+            if (!validationResult.success)
             {
-                return (false, "Token inválido ou usuário não encontrado.", null);
+                return (false, validationResult.message, null);
             }
+            long userId = validationResult.userId;
 
             var query = _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.UsuarioId == userId.Value);
+                .Where(t => t.UsuarioId == userId);
 
             if (!string.IsNullOrEmpty(status))
             {
@@ -195,15 +199,17 @@ public class TicketService
     {
         try
         {
-            var userId = await _authService.ObterIdDoToken(token);
-            if (userId == null)
+            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
+            var validationResult = await _usuarioService.ValidateToken(token);
+            if (!validationResult.success)
             {
-                return (false, "Token inválido ou usuário não encontrado.", null);
+                return (false, validationResult.message, null);
             }
+            long userId = validationResult.userId;
 
             var ticket = await _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.Id == ticketId && t.UsuarioId == userId.Value)
+                .Where(t => t.Id == ticketId && t.UsuarioId == userId)
                 .Single();
 
             if (ticket == null)
@@ -236,14 +242,16 @@ public class TicketService
     {
         try
         {
-            var userId = await _authService.ObterIdDoToken(token);
-            if (userId == null)
+            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
+            var validationResult = await _usuarioService.ValidateToken(token);
+            if (!validationResult.success)
             {
-                return (false, "Token inválido ou usuário não encontrado.", null);
+                return (false, validationResult.message, null);
             }
+            long userId = validationResult.userId;
             
             var ticket = await _supabaseClient.From<Ticket>()
-                .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId.Value)
+                .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId)
                 .Single();
             
             if (ticket == null)
@@ -256,7 +264,7 @@ public class TicketService
                 return (false, "Apenas tickets de 'Pagamento em Mão' podem ser exportados como PDF.", null);
             }
 
-            var usuario = await _usuarioService.ObterUsuarioPorId(userId.Value);
+            var usuario = await _usuarioService.ObterUsuarioPorId(userId);
             if (usuario == null)
             {
                 return (false, "Dados do usuário não encontrados.", null);
@@ -268,7 +276,8 @@ public class TicketService
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
-                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Arial")); // CORREÇÃO: Usando Arial
+                    // CORREÇÃO: Usando a fonte padrão "Lato" para evitar erros no ambiente de produção
+                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Lato")); 
                     
                     page.Header().Element(ComposeHeader);
                     page.Content().Element(x => ComposeContent(x, ticket, usuario));
