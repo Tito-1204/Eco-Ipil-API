@@ -47,13 +47,12 @@ public class TicketService
             return null;
         }
 
-        var user = await _supabaseClient
+        var response = await _supabaseClient
             .From<Usuario>()
-            .Where(u => string.Equals(u.UserUid, userUid))
             .Select("id")
             .Single();
 
-        return user?.Id;
+        return response?.Id;
     }
 
 
