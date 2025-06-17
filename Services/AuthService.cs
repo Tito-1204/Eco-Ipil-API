@@ -318,7 +318,7 @@ namespace EcoIpil.API.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        public long? ObterIdDoToken(string token)
+        public async Task<long?> ObterIdDoToken(string token)
         {
             if (string.IsNullOrEmpty(token))
             {
@@ -334,22 +334,37 @@ namespace EcoIpil.API.Services
                 {
                     ValidateIssuer = true,
                     ValidateAudience = true,
-                    ValidateLifetime = false, // Em desenvolvimento; defina como true em produção
+                    ValidateLifetime = false, 
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = _configuration["Jwt:Issuer"],
                     ValidAudience = _configuration["Jwt:Audience"],
                     IssuerSigningKey = key,
-                    RequireExpirationTime = false // Em desenvolvimento; defina como true em produção
+                    RequireExpirationTime = false
                 };
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
                 
-                // Extrai o ID numérico diretamente do claim principal (NameIdentifier)
                 var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
+                var userUidClaim = principal.FindFirst("uid")?.Value;
 
-                if (long.TryParse(userIdClaim, out long userId))
+                if (long.TryParse(userIdClaim, out long userId) && userId > 0)
                 {
                     return userId;
+                }
+
+                if (!string.IsNullOrEmpty(userUidClaim))
+                {
+                     var client = _supabaseService.GetClient();
+                     var response = await client.From<Usuario>()
+                        .Select("id")
+                        .Where(u => u.UserUid == userUidClaim)
+                        .Single();
+                    
+                    if(response != null)
+                    {
+                        return response.Id;
+                    }
                 }
 
                 return null;

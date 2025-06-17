@@ -34,10 +34,6 @@ public class TicketService
         _authService = authService;
     }
     
-    // Este método não é mais necessário pois a lógica foi movida para AuthService
-    // private async Task<long?> GetNumericUserIdFromToken(string? token) { ... }
-
-
     private string GenerateTicketCode()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -50,7 +46,7 @@ public class TicketService
     {
         try
         {
-            var userId = _authService.ObterIdDoToken(ticketDTO.Token);
+            var userId = await _authService.ObterIdDoToken(ticketDTO.Token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);
@@ -133,7 +129,7 @@ public class TicketService
     {
         try
         {
-            var userId = _authService.ObterIdDoToken(token);
+            var userId = await _authService.ObterIdDoToken(token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);
@@ -199,7 +195,7 @@ public class TicketService
     {
         try
         {
-            var userId = _authService.ObterIdDoToken(token);
+            var userId = await _authService.ObterIdDoToken(token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);
@@ -240,7 +236,7 @@ public class TicketService
     {
         try
         {
-            var userId = _authService.ObterIdDoToken(token);
+            var userId = await _authService.ObterIdDoToken(token);
             if (userId == null)
             {
                 return (false, "Token inválido ou usuário não encontrado.", null);
@@ -272,7 +268,7 @@ public class TicketService
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
-                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Helvetica"));
+                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Arial")); // CORREÇÃO: Usando Arial
                     
                     page.Header().Element(ComposeHeader);
                     page.Content().Element(x => ComposeContent(x, ticket, usuario));
