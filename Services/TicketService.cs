@@ -19,8 +19,7 @@ namespace EcoIpil.API.Services;
 
 public class TicketService
 {
-    private readonly Supabase.Client _supabaseClient; // Cliente para operações gerais
-    private readonly Supabase.Client _supabaseAdminClient; // Cliente para operações administrativas (Storage)
+    private readonly Supabase.Client _supabaseClient;
     private readonly UsuarioService _usuarioService;
     private readonly ILogger<TicketService> _logger;
     private readonly AuthService _authService;
@@ -38,7 +37,6 @@ public class TicketService
         _authService = authService;
     }
 
-    // Método auxiliar para gerar um ticket_code de 12 caracteres
     private string GenerateTicketCode()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -47,7 +45,6 @@ public class TicketService
             .Select(s => s[random.Next(s.Length)]).ToArray());
     }
 
-    // Criar um novo ticket
     public async Task<(bool success, string message, TicketResponseDTO? ticket)> CriarTicket(TicketCreateDTO ticketDTO)
     {
         try
@@ -61,7 +58,7 @@ public class TicketService
 
             if (ticketDTO.TipoOperacao != "LevantamentoExpress" && ticketDTO.TipoOperacao != "PagamentoMao" && ticketDTO.TipoOperacao != "ResgateRecompensa")
             {
-                return (false, "Tipo de operação inválido. Use 'LevantamentoExpress' ou 'PagamentoMao'.", null);
+                return (false, "Tipo de operação inválido.", null);
             }
 
             if (ticketDTO.Valor <= 0 && ticketDTO.TipoOperacao != "ResgateRecompensa")
@@ -76,7 +73,7 @@ public class TicketService
 
             if (carteira == null)
             {
-                return (false, "Carteira digital não encontrada para o usuário.", null);
+                return (false, "Carteira digital não encontrada.", null);
             }
 
             if (carteira.Saldo < ticketDTO.Valor)
@@ -85,36 +82,41 @@ public class TicketService
             }
 
             carteira.Saldo -= ticketDTO.Valor;
-            await _supabaseClient
-                .From<CarteiraDigital>()
-                .Where(c => c.UsuarioId == userId)
-                .Update(carteira);
+            await _supabaseClient.From<CarteiraDigital>().Update(carteira);
 
             var ticket = new Ticket
             {
-                Id = DateTime.UtcNow.Ticks,
-                CreatedAt = DateTime.UtcNow,
+                UsuarioId = userId,
+                TicketCode = GenerateTicketCode(),
                 TipoOperacao = ticketDTO.TipoOperacao,
                 Descricao = ticketDTO.Descricao,
-                Status = ticketDTO.TipoOperacao == "LevantamentoExpress" ? "Invalidado" : "Valido",
-                DataValidade = DateTime.UtcNow.AddDays(7),
                 Saldo = ticketDTO.Valor,
-                TicketCode = GenerateTicketCode(),
-                UsuarioId = userId
+                Status = "Valido",
+                CreatedAt = DateTime.UtcNow,
+                DataValidade = DateTime.UtcNow.AddDays(7)
             };
+            
+            if (ticket.TipoOperacao == "LevantamentoExpress") {
+                ticket.Status = "Invalidado";
+            }
 
-            await _supabaseClient.From<Ticket>().Insert(ticket);
+            var insertResponse = await _supabaseClient.From<Ticket>().Insert(ticket);
+            var insertedTicket = insertResponse.Models.FirstOrDefault();
+
+            if (insertedTicket == null) {
+                return (false, "Falha ao criar o ticket no banco de dados.", null);
+            }
 
             var ticketResponse = new TicketResponseDTO
             {
-                Id = ticket.Id,
-                CreatedAt = ticket.CreatedAt,
-                TipoOperacao = ticket.TipoOperacao,
-                Descricao = ticket.Descricao,
-                Status = ticket.Status,
-                DataValidade = ticket.DataValidade,
-                Saldo = ticket.Saldo,
-                TicketCode = ticket.TicketCode
+                Id = insertedTicket.Id,
+                CreatedAt = insertedTicket.CreatedAt,
+                TipoOperacao = insertedTicket.TipoOperacao,
+                Descricao = insertedTicket.Descricao,
+                Status = insertedTicket.Status,
+                DataValidade = insertedTicket.DataValidade,
+                Saldo = insertedTicket.Saldo,
+                TicketCode = insertedTicket.TicketCode
             };
 
             _logger.LogInformation("Ticket criado com sucesso para usuário {UserId}: {TicketId}", userId, ticket.Id);
@@ -127,8 +129,7 @@ public class TicketService
         }
     }
 
-    // Listar tickets do usuário
-    public async Task<(bool success, string message, TicketListResponseDTO? tickets)> ListarTickets(string token, string? status, int? pagina, int? limite)
+    public async Task<(bool success, string message, TicketListResponseDTO? tickets)> ListarTickets(string token, string? status, string? tipoOperacao, int? pagina, int? limite)
     {
         try
         {
@@ -147,17 +148,22 @@ public class TicketService
             {
                 query = query.Filter("status", Operator.Equals, status);
             }
-
-            var totalResponse = await query.Get();
-            int total = totalResponse.Models.Count;
-
-            if (pagina.HasValue && limite.HasValue)
+            
+            if (!string.IsNullOrEmpty(tipoOperacao))
             {
-                int from = (pagina.Value - 1) * limite.Value;
-                int to = from + limite.Value - 1;
-                query = query.Range(from, to);
+                query = query.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
             }
 
+            var countQuery = query.Count(CountType.Exact);
+            var total = await countQuery;
+            
+            int page = pagina ?? 1;
+            int pageSize = limite ?? 10;
+            int from = (page - 1) * pageSize;
+            int to = from + pageSize - 1;
+
+            query = query.Range(from, to).Order("created_at", Ordering.Descending);
+            
             var response = await query.Get();
             var tickets = response.Models.Select(t => new TicketResponseDTO
             {
@@ -176,10 +182,10 @@ public class TicketService
                 Tickets = tickets,
                 Meta = new PaginationMeta
                 {
-                    Total = total,
-                    Pagina = pagina ?? 1,
-                    Limite = limite ?? total,
-                    Paginas = limite.HasValue ? (int)Math.Ceiling((double)total / limite.Value) : 1
+                    Total = (int)total,
+                    Pagina = page,
+                    Limite = pageSize,
+                    Paginas = (int)Math.Ceiling((double)total / pageSize)
                 }
             };
 
@@ -192,7 +198,6 @@ public class TicketService
         }
     }
 
-    // Obter detalhes de um ticket específico
     public async Task<(bool success, string message, TicketResponseDTO? ticket)> ObterTicket(string token, long ticketId)
     {
         try
@@ -235,96 +240,44 @@ public class TicketService
         }
     }
 
-    /// <summary>
-    /// Método auxiliar para fazer upload do PDF para o bucket do Supabase e retornar o link público
-    /// </summary>
-    private async Task<(bool Success, string Message, string? PublicUrl)> UploadPdfToBucket(byte[] pdfBytes, long ticketId, long userId)
+    public async Task<(bool Success, string Message, byte[]? PdfBytes)> GerarPdfTicket(string token, string ticketCode)
     {
         try
         {
-            // Nome do arquivo no bucket: ticket-<ticketId>-user-<userId>.pdf
-            var fileName = $"ticket-{ticketId}-user-{userId}.pdf";
-
-            // Fazer upload do arquivo para o bucket "tickets-pdfs" usando o cliente admin
-            using var memoryStream = new MemoryStream(pdfBytes);
-            var response = await _supabaseAdminClient.Storage
-                .From("tickets-pdfs")
-                .Upload(pdfBytes, fileName, new Supabase.Storage.FileOptions
-                {
-                    ContentType = "application/pdf",
-                    CacheControl = "3600",
-                    Upsert = true // Sobrescrever se já existir
-                });
-
-            // Verificar se o upload foi bem-sucedido
-            if (response == null)
+            var validationResult = await _usuarioService.ValidateToken(token);
+            if (!validationResult.success)
             {
-                return (false, "Erro ao fazer upload do PDF para o bucket.", null);
+                return (false, validationResult.message, null);
             }
-
-            // Gerar o link público para o arquivo usando o cliente admin
-            var publicUrl = _supabaseAdminClient.Storage
-                .From("tickets-pdfs")
-                .GetPublicUrl(fileName);
-
-            return (true, "PDF carregado com sucesso para o bucket.", publicUrl);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Erro ao fazer upload do PDF para o bucket: {ex.Message}");
-            return (false, $"Erro ao fazer upload do PDF: {ex.Message}", null);
-        }
-    }
-
-    /// <summary>
-    /// Gera um PDF para um ticket de pagamento a mão e o armazena no bucket do Supabase
-    /// </summary>
-    public async Task<(bool Success, string Message, byte[]? PdfBytes, string? DownloadUrl)> GerarPdfTicket(string token, long ticketId)
-    {
-        try
-        {
-            var usuarioId = _authService.ObterIdDoToken(token);
-            
-            if (usuarioId == null)
-            {
-                return (false, "Token inválido ou expirado", null, null);
-            }
+            long userId = validationResult.userId;
             
             var ticket = await _supabaseClient.From<Ticket>()
-                .Select("*")
-                .Filter("id", Operator.Equals, ticketId)
-                .Filter("usuario_id", Operator.Equals, usuarioId.Value)
+                .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId)
                 .Single();
             
             if (ticket == null)
             {
-                return (false, "Ticket não encontrado ou não pertence ao usuário", null, null);
-            }
-            
-            if (ticket.Status != "Valido")
-            {
-                return (false, $"Ticket com status {ticket.Status} não pode ser exportado", null, null);
+                return (false, "Ticket não encontrado ou não pertence ao usuário.", null);
             }
             
             if (ticket.TipoOperacao != "PagamentoMao")
             {
-                return (false, "Apenas tickets de pagamento a mão podem ser exportados como PDF", null, null);
+                return (false, "Apenas tickets de 'Pagamento em Mão' podem ser exportados como PDF.", null);
             }
-            
-            var usuario = await _usuarioService.ObterUsuarioPorId(usuarioId.Value);
+
+            var usuario = await _usuarioService.ObterUsuarioPorId(userId);
             if (usuario == null)
             {
-                return (false, "Dados do usuário não encontrados", null, null);
+                return (false, "Dados do usuário não encontrados.", null);
             }
             
-            // Gerar o PDF
             byte[] pdfBytes = Document.Create(container =>
             {
                 container.Page(page =>
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
-                    page.DefaultTextStyle(x => x.FontSize(12));
+                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily(Fonts.Helvetica));
                     
                     page.Header().Element(ComposeHeader);
                     page.Content().Element(x => ComposeContent(x, ticket, usuario));
@@ -332,19 +285,12 @@ public class TicketService
                 });
             }).GeneratePdf();
 
-            // Fazer upload do PDF para o bucket do Supabase
-            var uploadResult = await UploadPdfToBucket(pdfBytes, ticketId, usuarioId.Value);
-            if (!uploadResult.Success)
-            {
-                return (false, uploadResult.Message, null, null);
-            }
-
-            return (true, "PDF gerado e armazenado com sucesso", pdfBytes, uploadResult.PublicUrl);
+            return (true, "PDF gerado com sucesso.", pdfBytes);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Erro ao gerar PDF para o ticket {ticketId}");
-            return (false, $"Erro ao gerar PDF: {ex.Message}", null, null);
+            _logger.LogError(ex, $"Erro ao gerar PDF para o ticket com código {ticketCode}");
+            return (false, $"Erro ao gerar PDF: {ex.Message}", null);
         }
     }
     
@@ -352,11 +298,10 @@ public class TicketService
     {
         container.Row(row =>
         {
-            row.ConstantItem(120).Height(60).Placeholder();
             row.RelativeItem().Column(col =>
             {
-                col.Item().AlignCenter().Text("EcoIpil").Bold().FontSize(20);
-                col.Item().AlignCenter().Text("Comprovante de Ticket").FontSize(14);
+                col.Item().AlignCenter().Text("EcoIpil").Bold().FontSize(24).FontColor(Colors.Green.Darken2);
+                col.Item().AlignCenter().Text("Comprovativo de Pedido de Levantamento").FontSize(14).SemiBold();
             });
             row.ConstantItem(120).AlignRight().Text(DateTime.Now.ToString("dd/MM/yyyy"));
         });
@@ -366,67 +311,56 @@ public class TicketService
     {
         container.PaddingVertical(20).Column(col =>
         {
-            col.Item().PaddingVertical(5).Component(new TicketInfoSection("Informações do Usuário"));
-            col.Item().Border(1).Background(Colors.Grey.Lighten3).Padding(10).Column(c =>
+            col.Item().Component(new TicketInfoSection("Informações do Utilizador"));
+            col.Item().Border(1, Colors.Grey.Lighten2).Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
             {
-                c.Item().Text($"Nome: {usuario.Nome}");
-                c.Item().Text($"Email: {usuario.Email}");
-                c.Item().Text($"ID: {usuario.Id}");
+                c.Item().Text(txt => { txt.Span("Nome: ").SemiBold(); txt.Span(usuario.Nome); });
+                c.Item().Text(txt => { txt.Span("Email: ").SemiBold(); txt.Span(usuario.Email); });
+                c.Item().Text(txt => { txt.Span("ID do Utilizador: ").SemiBold(); txt.Span(usuario.Id.ToString()); });
             });
             
-            col.Item().PaddingTop(15).PaddingVertical(5).Component(new TicketInfoSection("Detalhes do Ticket"));
-            col.Item().Border(1).Background(Colors.Grey.Lighten3).Padding(10).Column(c =>
+            col.Item().PaddingTop(20).Component(new TicketInfoSection("Detalhes do Ticket"));
+            col.Item().Border(1, Colors.Grey.Lighten2).Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
             {
-                c.Item().Text(text => text.Span($"Código: {ticket.TicketCode}").Bold());
-                c.Item().Text($"Tipo: {ticket.TipoOperacao}");
-                c.Item().Text($"Saldo: {ticket.Saldo:C2}");
-                c.Item().Text($"Data de Emissão: {ticket.CreatedAt:dd/MM/yyyy HH:mm}");
-                c.Item().Text($"Validade: {ticket.DataValidade:dd/MM/yyyy HH:mm}");
-                c.Item().Text($"Status: {ticket.Status}");
-                
-                if (!string.IsNullOrEmpty(ticket.Descricao))
-                {
-                    c.Item().Text($"Descrição: {ticket.Descricao}");
-                }
+                c.Item().Text(text => { text.Span("Código do Ticket: ").SemiBold(); text.Span(ticket.TicketCode).Bold().FontSize(14); });
+                c.Item().Text(txt => { txt.Span("Tipo de Operação: ").SemiBold(); txt.Span("Pagamento em Mão"); });
+                c.Item().Text(txt => { txt.Span("Valor: ").SemiBold(); txt.Span($"{ticket.Saldo:N2} AOA"); });
+                c.Item().Text(txt => { txt.Span("Data de Emissão: ").SemiBold(); txt.Span($"{ticket.CreatedAt:dd/MM/yyyy HH:mm}"); });
+                c.Item().Text(txt => { txt.Span("Data de Validade: ").SemiBold(); txt.Span($"{ticket.DataValidade:dd/MM/yyyy HH:mm}"); });
+                c.Item().Text(txt => { txt.Span("Status: ").SemiBold(); txt.Span(ticket.Status).FontColor(Colors.Green.Darken2).Bold(); });
             });
             
-            col.Item().PaddingTop(15).PaddingVertical(5).Component(new TicketInfoSection("Instruções"));
-            col.Item().Border(1).Background(Colors.Grey.Lighten3).Padding(10).Column(c =>
+            col.Item().PaddingTop(20).Component(new TicketInfoSection("Instruções"));
+            col.Item().Border(1, Colors.Grey.Lighten2).Background(Colors.Blue.Lighten5).Padding(10).Column(c =>
             {
-                c.Item().Text("1. Apresente este ticket a um agente EcoIpil.");
-                c.Item().Text("2. O agente irá inserir o código manualmente.");
-                c.Item().Text("3. Aguarde a confirmação do pagamento.");
-                c.Item().Text("4. Mantenha este comprovante até o processamento completo.");
-                c.Item().Text("5. Este ticket é pessoal e intransferível.");
-                c.Item().Text(text => text.Span($"6. Código de verificação: {ticket.TicketCode}").Bold());
+                c.Spacing(5);
+                c.Item().Text("1. Visite um Ecoponto ou Agente EcoIpil autorizado.");
+                c.Item().Text("2. Apresente este documento (impresso ou digital) ao agente.");
+                c.Item().Text(text => { text.Span("3. O agente irá validar o "); text.Span("Código do Ticket").Bold(); text.Span(" para processar o seu levantamento."); });
+                c.Item().Text("4. Após a validação, o valor será entregue em mãos.");
+                c.Item().Text("5. Este ticket é de uso único, pessoal e intransmissível.");
             });
             
-            col.Item().PaddingTop(20).Border(1).BorderColor(Colors.Grey.Medium).Padding(10).Column(c =>
+            col.Item().PaddingTop(20).BorderTop(1, Colors.Grey.Medium).PaddingTop(10).Column(c =>
             {
                 c.Item().Text(text => text.Span("Avisos Importantes:").Bold());
-                c.Item().Text("• Este documento é um comprovante oficial do EcoIpil.");
-                c.Item().Text("• O ticket tem validade conforme data indicada acima.");
-                c.Item().Text("• Em caso de dúvidas, entre em contato com nossa central de suporte.");
+                c.Item().Text("• Guarde este documento em segurança até a conclusão da operação.");
+                c.Item().Text("• Verifique a data de validade. O ticket não poderá ser usado após expirar.");
+                c.Item().Text("• Em caso de dúvidas, contacte o nosso suporte.");
             });
         });
     }
     
     private void ComposeFooter(IContainer container)
     {
-        container.Row(row =>
+        container.AlignCenter().Text(text =>
         {
-            row.RelativeItem().AlignLeft().Text(text => 
-            {
-                text.Span("EcoIpil © ").Bold();
-                text.Span($"{DateTime.Now.Year} - Todos os direitos reservados").FontSize(10);
-            });
-            
-            row.RelativeItem().AlignRight().Text(text =>
-            {
-                text.Span("Documento gerado em: ").FontSize(10);
-                text.Span($"{DateTime.Now:dd/MM/yyyy HH:mm:ss}").FontSize(10);
-            });
-        });
+            text.Span("EcoIpil © ").SemiBold();
+            text.Span($"{DateTime.Now.Year} - Agradecemos por ajudar o ambiente!");
+            text.CurrentPageNumber();
+            text.Span(" / ");
+            text.TotalPages();
+        }).FontSize(10);
     }
 }
 
@@ -441,6 +375,6 @@ public class TicketInfoSection : IComponent
     
     public void Compose(IContainer container)
     {
-        container.BorderBottom(1).BorderColor(Colors.Grey.Medium).Padding(5).Text(Title).Bold().FontSize(14);
+        container.BorderBottom(1, Colors.Grey.Medium).PaddingBottom(5).Text(Title).Bold().FontSize(16).FontColor(Colors.Green.Darken2);
     }
 }

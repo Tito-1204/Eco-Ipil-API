@@ -24,10 +24,11 @@ public class TicketController : ControllerBase
     public async Task<IActionResult> ListarTickets(
         [FromQuery] string token,
         [FromQuery] string? status,
+        [FromQuery] string? tipoOperacao, // Adicionado para filtrar por tipo
         [FromQuery] int? pagina,
         [FromQuery] int? limite)
     {
-        var (success, message, tickets) = await _ticketService.ListarTickets(token, status, pagina, limite);
+        var (success, message, tickets) = await _ticketService.ListarTickets(token, status, tipoOperacao, pagina, limite);
         if (success)
         {
             return Ok(new { status = true, data = tickets, message });
@@ -64,34 +65,21 @@ public class TicketController : ControllerBase
     }
 
     /// <summary>
-    /// Gera um PDF para um ticket de pagamento a mão, armazena no bucket do Supabase e retorna o PDF e o link de download
+    /// Gera um PDF para um ticket de pagamento a mão, armazena no bucket do Supabase e retorna o PDF.
     /// </summary>
-    [HttpPost("{id}/pdf")]
-    public async Task<IActionResult> GerarPdfTicket([FromRoute] long id, [FromBody] BaseRequestDTO request)
+    [HttpPost("{ticketCode}/pdf")]
+    public async Task<IActionResult> GerarPdfTicket([FromRoute] string ticketCode, [FromBody] BaseRequestDTO request)
     {
         try
         {
-            var (success, message, pdfBytes, downloadUrl) = await _ticketService.GerarPdfTicket(request.Token, id);
+            var (success, message, pdfBytes) = await _ticketService.GerarPdfTicket(request.Token, ticketCode);
 
-            if (!success)
+            if (!success || pdfBytes == null)
             {
                 return BadRequest(new { status = false, message });
             }
-
-            // Converter o PDF para base64 para visualização no navegador
-            var pdfBase64 = Convert.ToBase64String(pdfBytes!);
-
-            // Retornar uma resposta JSON com o PDF em base64 e o link de download
-            return Ok(new
-            {
-                status = true,
-                message = "PDF gerado, armazenado e disponível para visualização",
-                data = new
-                {
-                    pdfBase64 = pdfBase64, // Para visualização no navegador
-                    downloadUrl = downloadUrl // Link para download
-                }
-            });
+            
+            return File(pdfBytes, "application/pdf", $"ticket_{ticketCode}.pdf");
         }
         catch (Exception ex)
         {
