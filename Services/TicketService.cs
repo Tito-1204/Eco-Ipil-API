@@ -49,7 +49,7 @@ public class TicketService
 
         var user = await _supabaseClient
             .From<Usuario>()
-            .Filter("user_uid", Operator.Equals, userUid)
+            .Filter("user_uid", Operator.Equals, userUid.ToString())
             .Select("id")
             .Single();
 
