@@ -34,18 +34,22 @@ public class TicketService
         _authService = authService;
     }
     
-    private async Task<long?> GetNumericUserIdFromToken(string token)
+    private async Task<long?> GetNumericUserIdFromToken(string? token)
     {
-        var toti = "dois";
+        if (string.IsNullOrEmpty(token))
+        {
+            return null;
+        }
+
         var userUid = _authService.ObterIdDoToken(token);
-        if (string.IsNullOrEmpty(userUid))
+        if (userUid == null)
         {
             return null;
         }
 
         var user = await _supabaseClient
             .From<Usuario>()
-            .Where(u => u.UserUid == userUid) // CORREÇÃO: Removido o .ToString() redundante
+            .Filter("user_uid", Operator.Equals, userUid)
             .Select("id")
             .Single();
 
