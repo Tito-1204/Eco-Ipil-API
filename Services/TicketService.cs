@@ -167,7 +167,7 @@ public class TicketService
             var userId = await GetNumericUserIdFromToken(token);
             if (userId == null)
             {
-                return (false, "Token inválido ou usuário não encontrado.", null);
+                return (false, "Tokenene inválido ou usuário não encontrado.", null);
             }
 
             var query = _supabaseClient
