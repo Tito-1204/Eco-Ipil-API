@@ -36,6 +36,7 @@ public class TicketService
     
     private async Task<long?> GetNumericUserIdFromToken(string token)
     {
+        var toti = "dois";
         var userUid = _authService.ObterIdDoToken(token);
         if (string.IsNullOrEmpty(userUid))
         {
