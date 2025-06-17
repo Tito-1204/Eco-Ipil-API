@@ -33,18 +33,18 @@ public class TicketService
         _logger = logger;
         _authService = authService;
     }
-    
+
     private async Task<long?> GetNumericUserIdFromToken(string token)
     {
         var userUid = _authService.ObterIdDoToken(token);
-        if (string.IsNullOrEmpty(userUid))
+        if (userUid == null)
         {
             return null;
         }
 
         var user = await _supabaseClient
             .From<Usuario>()
-            .Where(u => u.UserUid == userUid)
+            .Where(u => u.UserUid == userUid.ToString())
             .Select("id")
             .Single();
 
