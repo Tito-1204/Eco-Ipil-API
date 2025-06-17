@@ -24,7 +24,7 @@ public class TicketController : ControllerBase
     public async Task<IActionResult> ListarTickets(
         [FromQuery] string token,
         [FromQuery] string? status,
-        [FromQuery] string? tipoOperacao, // Adicionado para filtrar por tipo
+        [FromQuery] string? tipoOperacao,
         [FromQuery] int? pagina,
         [FromQuery] int? limite)
     {
@@ -65,7 +65,7 @@ public class TicketController : ControllerBase
     }
 
     /// <summary>
-    /// Gera um PDF para um ticket de pagamento a mão, armazena no bucket do Supabase e retorna o PDF.
+    /// Gera um PDF para um ticket de pagamento a mão e retorna o arquivo.
     /// </summary>
     [HttpPost("{ticketCode}/pdf")]
     public async Task<IActionResult> GerarPdfTicket([FromRoute] string ticketCode, [FromBody] BaseRequestDTO request)

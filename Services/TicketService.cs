@@ -11,8 +11,6 @@ using static Supabase.Postgrest.Constants;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 
 namespace EcoIpil.API.Services;
@@ -31,7 +29,6 @@ public class TicketService
         AuthService authService)
     {
         _supabaseClient = supabaseService.GetClient();
-        _supabaseAdminClient = supabaseService.GetAdminClient(); // Cliente admin para Storage
         _usuarioService = usuarioService;
         _logger = logger;
         _authService = authService;
@@ -277,7 +274,7 @@ public class TicketService
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
-                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily(Fonts.Helvetica));
+                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Helvetica"));
                     
                     page.Header().Element(ComposeHeader);
                     page.Content().Element(x => ComposeContent(x, ticket, usuario));
@@ -312,7 +309,7 @@ public class TicketService
         container.PaddingVertical(20).Column(col =>
         {
             col.Item().Component(new TicketInfoSection("Informações do Utilizador"));
-            col.Item().Border(1, Colors.Grey.Lighten2).Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
+            col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
             {
                 c.Item().Text(txt => { txt.Span("Nome: ").SemiBold(); txt.Span(usuario.Nome); });
                 c.Item().Text(txt => { txt.Span("Email: ").SemiBold(); txt.Span(usuario.Email); });
@@ -320,7 +317,7 @@ public class TicketService
             });
             
             col.Item().PaddingTop(20).Component(new TicketInfoSection("Detalhes do Ticket"));
-            col.Item().Border(1, Colors.Grey.Lighten2).Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
+            col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
             {
                 c.Item().Text(text => { text.Span("Código do Ticket: ").SemiBold(); text.Span(ticket.TicketCode).Bold().FontSize(14); });
                 c.Item().Text(txt => { txt.Span("Tipo de Operação: ").SemiBold(); txt.Span("Pagamento em Mão"); });
@@ -331,7 +328,7 @@ public class TicketService
             });
             
             col.Item().PaddingTop(20).Component(new TicketInfoSection("Instruções"));
-            col.Item().Border(1, Colors.Grey.Lighten2).Background(Colors.Blue.Lighten5).Padding(10).Column(c =>
+            col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Background(Colors.Blue.Lighten5).Padding(10).Column(c =>
             {
                 c.Spacing(5);
                 c.Item().Text("1. Visite um Ecoponto ou Agente EcoIpil autorizado.");
@@ -341,7 +338,7 @@ public class TicketService
                 c.Item().Text("5. Este ticket é de uso único, pessoal e intransmissível.");
             });
             
-            col.Item().PaddingTop(20).BorderTop(1, Colors.Grey.Medium).PaddingTop(10).Column(c =>
+            col.Item().PaddingTop(20).BorderTop(1).BorderColor(Colors.Grey.Medium).PaddingTop(10).Column(c =>
             {
                 c.Item().Text(text => text.Span("Avisos Importantes:").Bold());
                 c.Item().Text("• Guarde este documento em segurança até a conclusão da operação.");
@@ -356,9 +353,9 @@ public class TicketService
         container.AlignCenter().Text(text =>
         {
             text.Span("EcoIpil © ").SemiBold();
-            text.Span($"{DateTime.Now.Year} - Agradecemos por ajudar o ambiente!");
+            text.Span($"{DateTime.Now.Year} - Agradecemos por ajudar o ambiente! Página ");
             text.CurrentPageNumber();
-            text.Span(" / ");
+            text.Span(" de ");
             text.TotalPages();
         }).FontSize(10);
     }
@@ -375,6 +372,6 @@ public class TicketInfoSection : IComponent
     
     public void Compose(IContainer container)
     {
-        container.BorderBottom(1, Colors.Grey.Medium).PaddingBottom(5).Text(Title).Bold().FontSize(16).FontColor(Colors.Green.Darken2);
+        container.BorderBottom(1).BorderColor(Colors.Grey.Medium).PaddingBottom(5).Text(Title).Bold().FontSize(16).FontColor(Colors.Green.Darken2);
     }
 }
