@@ -46,13 +46,26 @@ public class TicketService
         {
             return null;
         }
+        
+        // CORREÇÃO: Chamando a função RPC em vez de um SELECT direto
+        try
+        {
+            var parameters = new Dictionary<string, object> { { "p_user_uid", userUid } };
+            var userId = await _supabaseClient.Rpc("get_user_id_by_uid", parameters);
+            
+            if (userId.ResponseMessage.IsSuccessStatusCode && userId.Content != null && long.TryParse(userId.Content, out long parsedId))
+            {
+                // Se o ID for 0, significa que o usuário não foi encontrado pela função.
+                return parsedId > 0 ? parsedId : null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao chamar a função RPC get_user_id_by_uid para o UID: {userUid}", userUid);
+            return null;
+        }
 
-        var response = await _supabaseClient
-            .From<Usuario>()
-            .Select("id")
-            .Single();
-
-        return response?.Id;
+        return null;
     }
 
 
