@@ -38,34 +38,40 @@ public class TicketService
     {
         if (string.IsNullOrEmpty(token))
         {
+            _logger.LogWarning("GetNumericUserIdFromToken foi chamado com token nulo ou vazio.");
             return null;
         }
 
         var userUid = _authService.ObterIdDoToken(token);
         if (userUid == null)
         {
+            _logger.LogWarning("AuthService.ObterIdDoToken retornou nulo para o token fornecido.");
             return null;
         }
         
-        // CORREÇÃO: Chamando a função RPC em vez de um SELECT direto
         try
         {
             var parameters = new Dictionary<string, object> { { "p_user_uid", userUid } };
-            var userId = await _supabaseClient.Rpc("get_user_id_by_uid", parameters);
             
-            if (userId.ResponseMessage.IsSuccessStatusCode && userId.Content != null && long.TryParse(userId.Content, out long parsedId))
+            // CORREÇÃO: Acessar o resultado diretamente, pois ele já é do tipo `long?`
+            var userId = await _supabaseClient.Rpc<long?>("get_user_id_by_uid", parameters);
+            
+            if (userId.HasValue && userId.Value > 0)
             {
-                // Se o ID for 0, significa que o usuário não foi encontrado pela função.
-                return parsedId > 0 ? parsedId : null;
+                _logger.LogInformation("RPC get_user_id_by_uid retornou o ID: {UserId} para o UID: {UserUid}", userId.Value, userUid);
+                return userId.Value;
+            }
+            else
+            {
+                _logger.LogWarning("RPC get_user_id_by_uid não retornou um ID válido para o UID: {UserUid}", userUid);
+                return null;
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao chamar a função RPC get_user_id_by_uid para o UID: {userUid}", userUid);
+            _logger.LogError(ex, "Exceção ao chamar a função RPC get_user_id_by_uid para o UID: {userUid}", userUid);
             return null;
         }
-
-        return null;
     }
 
 
@@ -167,7 +173,7 @@ public class TicketService
             var userId = await GetNumericUserIdFromToken(token);
             if (userId == null)
             {
-                return (false, "Tokenene inválido ou usuário não encontrado.", null);
+                return (false, "Token inválido ou usuário não encontrado.", null);
             }
 
             var query = _supabaseClient
