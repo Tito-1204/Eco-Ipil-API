@@ -352,24 +352,26 @@ public class TicketService
     {
         container.AlignCenter().Text(text =>
         {
+            text.DefaultTextStyle(x => x.FontSize(10));
+            
             text.Span("EcoIpil © ").SemiBold();
             text.Span($"{DateTime.Now.Year} - Agradecemos por ajudar o ambiente! Página ");
             text.CurrentPageNumber();
             text.Span(" de ");
             text.TotalPages();
-        }).FontSize(10);
+        });
     }
 }
 
 public class TicketInfoSection : IComponent
 {
     private string Title { get; }
-    
+
     public TicketInfoSection(string title)
     {
         Title = title;
     }
-    
+
     public void Compose(IContainer container)
     {
         container.BorderBottom(1).BorderColor(Colors.Grey.Medium).PaddingBottom(5).Text(Title).Bold().FontSize(16).FontColor(Colors.Green.Darken2);
