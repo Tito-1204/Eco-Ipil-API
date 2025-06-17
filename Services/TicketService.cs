@@ -41,15 +41,15 @@ public class TicketService
             return null;
         }
 
-        var userUid = _authService.ObterIdDoToken(token);
-        if (userUid == null)
+        var userUid = _authService.ObterIdDoToken(token)?.ToString();
+        if (string.IsNullOrEmpty(userUid))
         {
             return null;
         }
 
         var user = await _supabaseClient
             .From<Usuario>()
-            .Filter("user_uid", Operator.Equals, userUid)
+            .Filter("user_uid", Operator.Equals, userUid.ToString())
             .Select("id")
             .Single();
 
