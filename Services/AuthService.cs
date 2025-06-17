@@ -103,7 +103,7 @@ namespace EcoIpil.API.Services
                     Console.WriteLine($"Erro ao atualizar último login: {updateEx.Message}");
                 }
 
-                var token = GerarToken(usuario); // Passando o objeto usuário inteiro
+                var token = GerarToken(usuario);
                 return (true, "Login realizado com sucesso", token);
             }
             catch (Exception ex)
@@ -298,9 +298,10 @@ namespace EcoIpil.API.Services
         {
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()), // Armazena o ID numérico
+                // CORREÇÃO: O identificador principal (NameIdentifier) agora é o UserUid (string/uuid).
+                new Claim(ClaimTypes.NameIdentifier, usuario.UserUid ?? ""), 
                 new Claim(ClaimTypes.Email, usuario.Email ?? ""),
-                new Claim("uid", usuario.UserUid ?? "") // Mantém o UID para referência, se necessário
+                new Claim("id_numerico", usuario.Id.ToString()) // Adicionando o ID numérico como um claim separado
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key não configurada")));
@@ -344,15 +345,15 @@ namespace EcoIpil.API.Services
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
                 
-                var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                
-                var userUidClaim = principal.FindFirst("uid")?.Value;
-
+                // Prioridade 1: Tentar obter o claim "id_numerico"
+                var userIdClaim = principal.FindFirst("id_numerico")?.Value;
                 if (long.TryParse(userIdClaim, out long userId) && userId > 0)
                 {
                     return userId;
                 }
 
+                // Prioridade 2 (Fallback): Obter o UID e buscar no banco
+                var userUidClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (!string.IsNullOrEmpty(userUidClaim))
                 {
                      var client = _supabaseService.GetClient();
