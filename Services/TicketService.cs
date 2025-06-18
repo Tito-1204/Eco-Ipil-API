@@ -8,10 +8,12 @@ using Microsoft.Extensions.Logging;
 using Supabase;
 using Supabase.Postgrest;
 using static Supabase.Postgrest.Constants;
+using Postgrest = Supabase.Postgrest;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.IO;
+using Supabase.Realtime;
 
 namespace EcoIpil.API.Services;
 
@@ -136,22 +138,20 @@ public class TicketService
                 return (false, validationResult.message, null);
             }
             long userId = validationResult.userId;
-
-            var query = _supabaseClient
-                .From<Ticket>();
-                
+            var query = (Postgrest.Table<Ticket>)_supabaseClient.From<Ticket>();
+            var filter = query;
 
             if (!string.IsNullOrEmpty(status))
             {
-                query = query.Filter("status", Operator.Equals, status);
+                filter = filter.Filter("status", Operator.Equals, status);
             }
             
             if (!string.IsNullOrEmpty(tipoOperacao))
             {
-                query = query.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
+                filter = filter.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
             }
 
-            var countResponse = await query.Count(CountType.Exact);
+            var countResponse = await filter.Count(CountType.Exact);
             _logger.LogInformation($"Found {countResponse} tickets for user {userId}");
             
             int page = pagina ?? 1;
