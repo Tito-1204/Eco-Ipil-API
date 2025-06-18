@@ -139,7 +139,7 @@ public class TicketService
 
             var query = _supabaseClient
                 .From<Ticket>()
-                .Filter("usuario_id", Constants.Operator.Equals, userId.ToString()); // Convert userId to string
+                .Where(t => t.UsuarioId == userId);
 
             if (!string.IsNullOrEmpty(status))
             {
