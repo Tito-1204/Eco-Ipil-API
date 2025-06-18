@@ -27,7 +27,7 @@ public class Ticket : BaseModel
     public DateTime? DataValidade { get; set; }
 
     [Column("saldo")]
-    public decimal Saldo { get; set; }
+    public float Saldo { get; set; } // CORREÇÃO: decimal para float
 
     [Column("ticket_code")]
     public string? TicketCode { get; set; }

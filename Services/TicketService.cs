@@ -46,7 +46,6 @@ public class TicketService
     {
         try
         {
-            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
             var validationResult = await _usuarioService.ValidateToken(ticketDTO.Token);
             if (!validationResult.success)
             {
@@ -88,7 +87,7 @@ public class TicketService
                 TicketCode = GenerateTicketCode(),
                 TipoOperacao = ticketDTO.TipoOperacao,
                 Descricao = ticketDTO.Descricao,
-                Saldo = ticketDTO.Valor,
+                Saldo = (float)ticketDTO.Valor, // CORREÇÃO: Casting para float
                 Status = "Valido",
                 CreatedAt = DateTime.UtcNow,
                 DataValidade = DateTime.UtcNow.AddDays(7)
@@ -131,7 +130,6 @@ public class TicketService
     {
         try
         {
-            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
             var validationResult = await _usuarioService.ValidateToken(token);
             if (!validationResult.success)
             {
@@ -199,7 +197,6 @@ public class TicketService
     {
         try
         {
-            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
             var validationResult = await _usuarioService.ValidateToken(token);
             if (!validationResult.success)
             {
@@ -242,7 +239,6 @@ public class TicketService
     {
         try
         {
-            // CORREÇÃO: Usando o método de validação do UsuarioService que já funciona
             var validationResult = await _usuarioService.ValidateToken(token);
             if (!validationResult.success)
             {
@@ -276,7 +272,6 @@ public class TicketService
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
-                    // CORREÇÃO: Usando a fonte padrão "Lato" para evitar erros no ambiente de produção
                     page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Lato")); 
                     
                     page.Header().Element(ComposeHeader);

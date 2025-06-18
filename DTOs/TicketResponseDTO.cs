@@ -10,6 +10,6 @@ public class TicketResponseDTO
     public string? Descricao { get; set; }
     public string? Status { get; set; }
     public DateTime? DataValidade { get; set; }
-    public decimal Saldo { get; set; }
+    public float Saldo { get; set; } // CORREÇÃO: decimal para float
     public string? TicketCode { get; set; }
 }
