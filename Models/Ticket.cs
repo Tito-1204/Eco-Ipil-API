@@ -27,11 +27,11 @@ public class Ticket : BaseModel
     public DateTime? DataValidade { get; set; }
 
     [Column("saldo")]
-    public float Saldo { get; set; } // CORREÇÃO: decimal para float
+    public float Saldo { get; set; }
 
     [Column("ticket_code")]
     public string? TicketCode { get; set; }
 
     [Column("usuario_id")]
-    public long UsuarioId { get; set; }
+    public long? UsuarioId { get; set; } // CORREÇÃO: de 'long' para 'long?' para permitir nulos
 }

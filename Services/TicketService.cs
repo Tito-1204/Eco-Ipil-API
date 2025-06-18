@@ -8,12 +8,10 @@ using Microsoft.Extensions.Logging;
 using Supabase;
 using Supabase.Postgrest;
 using static Supabase.Postgrest.Constants;
-using Postgrest = Supabase.Postgrest;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.IO;
-using Supabase.Realtime;
 
 namespace EcoIpil.API.Services;
 
@@ -89,7 +87,7 @@ public class TicketService
                 TicketCode = GenerateTicketCode(),
                 TipoOperacao = ticketDTO.TipoOperacao,
                 Descricao = ticketDTO.Descricao,
-                Saldo = (float)ticketDTO.Valor, // CORREÇÃO: Casting para float
+                Saldo = (float)ticketDTO.Valor,
                 Status = "Valido",
                 CreatedAt = DateTime.UtcNow,
                 DataValidade = DateTime.UtcNow.AddDays(7)
@@ -138,48 +136,45 @@ public class TicketService
                 return (false, validationResult.message, null);
             }
             long userId = validationResult.userId;
-            var query = (Postgrest.Table<Ticket>)_supabaseClient.From<Ticket>();
-            var filter = query;
+
+            var query = _supabaseClient
+                .From<Ticket>()
+                .Where(t => t.UsuarioId == userId); // CORREÇÃO: Comparando long? com long
 
             if (!string.IsNullOrEmpty(status))
             {
-                filter = filter.Filter("status", Operator.Equals, status);
+                query = query.Filter("status", Operator.Equals, status);
             }
             
             if (!string.IsNullOrEmpty(tipoOperacao))
             {
-                filter = filter.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
+                query = query.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
             }
 
-            var countResponse = await filter.Count(CountType.Exact);
-            _logger.LogInformation($"Found {countResponse} tickets for user {userId}");
+            var countResponse = await query.Count(CountType.Exact);
             
             int page = pagina ?? 1;
             int pageSize = limite ?? 10;
             int from = (page - 1) * pageSize;
             
-            var response = await query
-                .Order("created_at", Ordering.Descending)
-                .Range(from, from + pageSize - 1)
-                .Get();
-
-            var tickets = response.Models;
-
-            var ticketDtos = tickets.Select(t => new TicketResponseDTO
+            query = query.Range(from, from + pageSize - 1).Order("created_at", Ordering.Descending);
+            
+            var response = await query.Get();
+            var tickets = response.Models.Select(t => new TicketResponseDTO
             {
                 Id = t.Id,
                 CreatedAt = t.CreatedAt,
-                TipoOperacao = t.TipoOperacao ?? "",
-                Descricao = t.Descricao ?? "",
-                Status = t.Status ?? "",
+                TipoOperacao = t.TipoOperacao,
+                Descricao = t.Descricao,
+                Status = t.Status,
                 DataValidade = t.DataValidade,
-                Saldo = (float)t.Saldo,
-                TicketCode = t.TicketCode ?? ""
+                Saldo = t.Saldo,
+                TicketCode = t.TicketCode
             }).ToList();
 
             var result = new TicketListResponseDTO
             {
-                Tickets = ticketDtos,
+                Tickets = tickets,
                 Meta = new PaginationMeta
                 {
                     Total = countResponse,
@@ -211,7 +206,7 @@ public class TicketService
 
             var ticket = await _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.Id == ticketId && t.UsuarioId == userId)
+                .Where(t => t.Id == ticketId && t.UsuarioId == userId) // CORREÇÃO: Comparando long? com long
                 .Single();
 
             if (ticket == null)
@@ -252,7 +247,7 @@ public class TicketService
             long userId = validationResult.userId;
             
             var ticket = await _supabaseClient.From<Ticket>()
-                .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId)
+                .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId) // CORREÇÃO: Comparando long? com long
                 .Single();
             
             if (ticket == null)
