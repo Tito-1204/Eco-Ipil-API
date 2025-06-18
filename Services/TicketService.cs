@@ -139,7 +139,7 @@ public class TicketService
 
             var query = _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.UsuarioId == userId);
+                .Filter("usuario_id", Operator.Equals, userId);
 
             if (!string.IsNullOrEmpty(status))
             {
@@ -152,6 +152,7 @@ public class TicketService
             }
 
             var countResponse = await query.Count(CountType.Exact);
+            _logger.LogInformation($"Found {countResponse} tickets for user {userId}");
             
             int page = pagina ?? 1;
             int pageSize = limite ?? 10;
