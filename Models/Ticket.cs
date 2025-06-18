@@ -26,15 +26,16 @@ public class Ticket : BaseModel
     [Column("data_validade")]
     public DateTime? DataValidade { get; set; }
 
-    // CORREÇÃO: Alinhando com a nulidade da tabela (real null)
+    // CORREÇÃO DEFINITIVA 1: 'real null' no banco de dados corresponde a 'float?' em C#
     [Column("saldo")]
     public float? Saldo { get; set; } 
 
     [Column("ticket_code")]
     public string? TicketCode { get; set; }
 
+    // CORREÇÃO DEFINITIVA 2: 'bigint null' no banco de dados corresponde a 'long?' em C#
     [Column("usuario_id")]
-    public long UsuarioId { get; set; }
+    public long? UsuarioId { get; set; }
 
     [Column("agente_id")]
     public long? AgenteId { get; set; }
