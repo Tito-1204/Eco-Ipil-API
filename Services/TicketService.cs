@@ -139,16 +139,16 @@ public class TicketService
 
             var query = _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.UsuarioId == userId);
+                .Where(x => x.UsuarioId == userId);
 
             if (!string.IsNullOrEmpty(status))
             {
-                query = query.Filter("status", Constants.Operator.Equals, status);
+                query = query.Filter("status", Operator.Equals, status);
             }
             
             if (!string.IsNullOrEmpty(tipoOperacao))
             {
-                query = query.Filter("tipo_operacao", Constants.Operator.Equals, tipoOperacao);
+                query = query.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
             }
 
             var countResponse = await query.Count(CountType.Exact);
@@ -158,24 +158,28 @@ public class TicketService
             int pageSize = limite ?? 10;
             int from = (page - 1) * pageSize;
             
-            query = query.Range(from, from + pageSize - 1).Order("created_at", Constants.Ordering.Descending);
-            
-            var response = await query.Get();
-            var tickets = response.Models.Select(t => new TicketResponseDTO
+            var response = await query
+                .Order("created_at", Ordering.Descending)
+                .Range(from, from + pageSize - 1)
+                .Get();
+
+            var tickets = response.Models;
+
+            var ticketDtos = tickets.Select(t => new TicketResponseDTO
             {
                 Id = t.Id,
                 CreatedAt = t.CreatedAt,
-                TipoOperacao = t.TipoOperacao,
-                Descricao = t.Descricao,
-                Status = t.Status,
+                TipoOperacao = t.TipoOperacao ?? "",
+                Descricao = t.Descricao ?? "",
+                Status = t.Status ?? "",
                 DataValidade = t.DataValidade,
-                Saldo = t.Saldo,
-                TicketCode = t.TicketCode
+                Saldo = (float)t.Saldo,
+                TicketCode = t.TicketCode ?? ""
             }).ToList();
 
             var result = new TicketListResponseDTO
             {
-                Tickets = tickets,
+                Tickets = ticketDtos,
                 Meta = new PaginationMeta
                 {
                     Total = countResponse,
