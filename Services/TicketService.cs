@@ -139,7 +139,7 @@ public class TicketService
 
             var query = _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.UsuarioId == userId); // CORREÇÃO: Comparando long? com long
+                .Where(t => t.UsuarioId == userId);
 
             if (!string.IsNullOrEmpty(status))
             {
@@ -206,7 +206,7 @@ public class TicketService
 
             var ticket = await _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.Id == ticketId && t.UsuarioId == userId) // CORREÇÃO: Comparando long? com long
+                .Where(t => t.Id == ticketId && t.UsuarioId == userId)
                 .Single();
 
             if (ticket == null)
@@ -247,7 +247,7 @@ public class TicketService
             long userId = validationResult.userId;
             
             var ticket = await _supabaseClient.From<Ticket>()
-                .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId) // CORREÇÃO: Comparando long? com long
+                .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId)
                 .Single();
             
             if (ticket == null)
@@ -319,7 +319,8 @@ public class TicketService
             {
                 c.Item().Text(text => { text.Span("Código do Ticket: ").SemiBold(); text.Span(ticket.TicketCode).Bold().FontSize(14); });
                 c.Item().Text(txt => { txt.Span("Tipo de Operação: ").SemiBold(); txt.Span("Pagamento em Mão"); });
-                c.Item().Text(txt => { txt.Span("Valor: ").SemiBold(); txt.Span($"{ticket.Saldo:N2} AOA"); });
+                // CORREÇÃO: Usando GetValueOrDefault para lidar com o saldo nulo de forma segura
+                c.Item().Text(txt => { txt.Span("Valor: ").SemiBold(); txt.Span($"{ticket.Saldo.GetValueOrDefault(0):N2} AOA"); });
                 c.Item().Text(txt => { txt.Span("Data de Emissão: ").SemiBold(); txt.Span($"{ticket.CreatedAt:dd/MM/yyyy HH:mm}"); });
                 c.Item().Text(txt => { txt.Span("Data de Validade: ").SemiBold(); txt.Span($"{ticket.DataValidade:dd/MM/yyyy HH:mm}"); });
                 c.Item().Text(txt => { txt.Span("Status: ").SemiBold(); txt.Span(ticket.Status).FontColor(Colors.Green.Darken2).Bold(); });

@@ -26,16 +26,16 @@ public class Ticket : BaseModel
     [Column("data_validade")]
     public DateTime? DataValidade { get; set; }
 
+    // CORREÇÃO: Alinhando com a nulidade da tabela (real null)
     [Column("saldo")]
-    public float Saldo { get; set; }
+    public float? Saldo { get; set; } 
 
     [Column("ticket_code")]
     public string? TicketCode { get; set; }
 
     [Column("usuario_id")]
     public long UsuarioId { get; set; }
-    
-    // CORREÇÃO: Adicionando a propriedade que faltava para corresponder à tabela.
+
     [Column("agente_id")]
     public long? AgenteId { get; set; }
 }
