@@ -139,16 +139,16 @@ public class TicketService
 
             var query = _supabaseClient
                 .From<Ticket>()
-                .Filter("usuario_id", Operator.Equals, userId);
+                .Filter("usuario_id", Constants.Operator.Equals, userId.ToString()); // Convert userId to string
 
             if (!string.IsNullOrEmpty(status))
             {
-                query = query.Filter("status", Operator.Equals, status);
+                query = query.Filter("status", Constants.Operator.Equals, status);
             }
             
             if (!string.IsNullOrEmpty(tipoOperacao))
             {
-                query = query.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
+                query = query.Filter("tipo_operacao", Constants.Operator.Equals, tipoOperacao);
             }
 
             var countResponse = await query.Count(CountType.Exact);
@@ -158,7 +158,7 @@ public class TicketService
             int pageSize = limite ?? 10;
             int from = (page - 1) * pageSize;
             
-            query = query.Range(from, from + pageSize - 1).Order("created_at", Ordering.Descending);
+            query = query.Range(from, from + pageSize - 1).Order("created_at", Constants.Ordering.Descending);
             
             var response = await query.Get();
             var tickets = response.Models.Select(t => new TicketResponseDTO
