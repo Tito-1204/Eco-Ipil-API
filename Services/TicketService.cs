@@ -137,9 +137,11 @@ public class TicketService
             }
             long userId = validationResult.userId;
 
+            // Lógica "clonada" do ObterTicket, mas para uma lista
             var query = _supabaseClient
                 .From<Ticket>()
-                .Where(t => t.UsuarioId == userId);
+                .Match(new Dictionary<string, string> { { "usuario_id", userId.ToString() } });
+
 
             if (!string.IsNullOrEmpty(status))
             {
@@ -150,16 +152,16 @@ public class TicketService
             {
                 query = query.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
             }
+            
+            query = query.Order("created_at", Ordering.Descending);
 
-            var countResponse = await query.Count(CountType.Exact);
-            
-            int page = pagina ?? 1;
-            int pageSize = limite ?? 10;
-            int from = (page - 1) * pageSize;
-            
-            query = query.Range(from, from + pageSize - 1).Order("created_at", Ordering.Descending);
-            
             var response = await query.Get();
+            
+            if (response.Models == null)
+            {
+                 return (false, "A resposta do banco de dados foi nula.", null);
+            }
+
             var tickets = response.Models.Select(t => new TicketResponseDTO
             {
                 Id = t.Id,
@@ -177,10 +179,10 @@ public class TicketService
                 Tickets = tickets,
                 Meta = new PaginationMeta
                 {
-                    Total = countResponse,
-                    Pagina = page,
-                    Limite = pageSize,
-                    Paginas = (int)Math.Ceiling((double)countResponse / pageSize)
+                    Total = tickets.Count, // A contagem total agora é baseada nos resultados retornados
+                    Pagina = 1, // Paginação simplificada por agora
+                    Limite = tickets.Count,
+                    Paginas = 1
                 }
             };
 
@@ -319,8 +321,7 @@ public class TicketService
             {
                 c.Item().Text(text => { text.Span("Código do Ticket: ").SemiBold(); text.Span(ticket.TicketCode).Bold().FontSize(14); });
                 c.Item().Text(txt => { txt.Span("Tipo de Operação: ").SemiBold(); txt.Span("Pagamento em Mão"); });
-                // CORREÇÃO: Usando GetValueOrDefault para lidar com o saldo nulo de forma segura
-                c.Item().Text(txt => { txt.Span("Valor: ").SemiBold(); txt.Span($"{ticket.Saldo.GetValueOrDefault(0):N2} AOA"); });
+                c.Item().Text(txt => { txt.Span("Valor: ").SemiBold(); txt.Span($"{ticket.Saldo:N2} AOA"); });
                 c.Item().Text(txt => { txt.Span("Data de Emissão: ").SemiBold(); txt.Span($"{ticket.CreatedAt:dd/MM/yyyy HH:mm}"); });
                 c.Item().Text(txt => { txt.Span("Data de Validade: ").SemiBold(); txt.Span($"{ticket.DataValidade:dd/MM/yyyy HH:mm}"); });
                 c.Item().Text(txt => { txt.Span("Status: ").SemiBold(); txt.Span(ticket.Status).FontColor(Colors.Green.Darken2).Bold(); });
