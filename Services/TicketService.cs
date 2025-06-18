@@ -138,8 +138,8 @@ public class TicketService
             long userId = validationResult.userId;
 
             var query = _supabaseClient
-                .From<Ticket>()
-                .Where(x => x.UsuarioId == userId);
+                .From<Ticket>();
+                
 
             if (!string.IsNullOrEmpty(status))
             {
