@@ -33,5 +33,9 @@ public class Ticket : BaseModel
     public string? TicketCode { get; set; }
 
     [Column("usuario_id")]
-    public long? UsuarioId { get; set; } // CORREÇÃO: de 'long' para 'long?' para permitir nulos
+    public long UsuarioId { get; set; }
+    
+    // CORREÇÃO: Adicionando a propriedade que faltava para corresponder à tabela.
+    [Column("agente_id")]
+    public long? AgenteId { get; set; }
 }
