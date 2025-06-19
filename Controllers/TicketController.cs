@@ -17,9 +17,6 @@ public class TicketController : ControllerBase
         _ticketService = ticketService;
     }
 
-    /// <summary>
-    /// Lista os tickets do usuário
-    /// </summary>
     [HttpGet]
     public async Task<IActionResult> ListarTickets(
         [FromQuery] string token,
@@ -36,9 +33,6 @@ public class TicketController : ControllerBase
         return BadRequest(new { status = false, message });
     }
 
-    /// <summary>
-    /// Obtém detalhes de um ticket específico
-    /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> ObterTicket([FromRoute] long id, [FromQuery] string token)
     {
@@ -50,9 +44,6 @@ public class TicketController : ControllerBase
         return BadRequest(new { status = false, message });
     }
 
-    /// <summary>
-    /// Gera um novo ticket
-    /// </summary>
     [HttpPost("gerar")]
     public async Task<IActionResult> GerarTicket([FromBody] TicketCreateDTO ticketDTO)
     {
@@ -64,9 +55,6 @@ public class TicketController : ControllerBase
         return BadRequest(new { status = false, message });
     }
 
-    /// <summary>
-    /// Gera um PDF para um ticket de pagamento a mão e retorna o arquivo.
-    /// </summary>
     [HttpPost("{ticketCode}/pdf")]
     public async Task<IActionResult> GerarPdfTicket([FromRoute] string ticketCode, [FromBody] BaseRequestDTO request)
     {
@@ -85,5 +73,16 @@ public class TicketController : ControllerBase
         {
             return StatusCode(500, new { status = false, message = $"Erro interno: {ex.Message}" });
         }
+    }
+    
+    [HttpPost("{id}/reembolsar")]
+    public async Task<IActionResult> ReembolsarTicket([FromRoute] long id, [FromBody] BaseRequestDTO request)
+    {
+        var (success, message) = await _ticketService.ReembolsarTicket(request.Token, id);
+        if (success)
+        {
+            return Ok(new { status = true, message });
+        }
+        return BadRequest(new { status = false, message });
     }
 }

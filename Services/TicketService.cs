@@ -137,7 +137,6 @@ public class TicketService
             }
             long userId = validationResult.userId;
 
-            // Lógica "clonada" do ObterTicket, mas para uma lista
             var query = _supabaseClient
                 .From<Ticket>()
                 .Match(new Dictionary<string, string> { { "usuario_id", userId.ToString() } });
@@ -179,8 +178,8 @@ public class TicketService
                 Tickets = tickets,
                 Meta = new PaginationMeta
                 {
-                    Total = tickets.Count, // A contagem total agora é baseada nos resultados retornados
-                    Pagina = 1, // Paginação simplificada por agora
+                    Total = tickets.Count,
+                    Pagina = 1,
                     Limite = tickets.Count,
                     Paginas = 1
                 }
@@ -291,6 +290,63 @@ public class TicketService
         }
     }
     
+    public async Task<(bool success, string message)> ReembolsarTicket(string token, long ticketId)
+    {
+        try
+        {
+            var validationResult = await _usuarioService.ValidateToken(token);
+            if (!validationResult.success)
+            {
+                return (false, validationResult.message);
+            }
+            long userId = validationResult.userId;
+
+            var ticket = await _supabaseClient
+                .From<Ticket>()
+                .Where(t => t.Id == ticketId && t.UsuarioId == userId)
+                .Single();
+
+            if (ticket == null)
+            {
+                return (false, "Ticket não encontrado ou não pertence ao usuário.");
+            }
+            
+            if (ticket.Status == "Reembolsado" || ticket.Status == "Pago")
+            {
+                return (false, $"Ticket com status '{ticket.Status}' não pode ser reembolsado.");
+            }
+            
+            var tempoDesdeCriacao = DateTime.UtcNow - ticket.CreatedAt;
+            if (tempoDesdeCriacao.TotalHours <= 2)
+            {
+                return (false, "O ticket só pode ser reembolsado após 2 horas da sua criação.");
+            }
+
+            var carteira = await _supabaseClient
+                .From<CarteiraDigital>()
+                .Where(c => c.UsuarioId == userId)
+                .Single();
+
+            if (carteira == null)
+            {
+                return (false, "Carteira digital não encontrada para o usuário.");
+            }
+
+            carteira.Saldo += ticket.Saldo;
+            await _supabaseClient.From<CarteiraDigital>().Update(carteira);
+
+            ticket.Status = "Reembolsado";
+            await _supabaseClient.From<Ticket>().Update(ticket);
+
+            return (true, "Ticket reembolsado com sucesso. O valor foi adicionado de volta à sua carteira.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao reembolsar o ticket {TicketId}.", ticketId);
+            return (false, $"Erro ao processar o reembolso: {ex.Message}");
+        }
+    }
+
     private void ComposeHeader(IContainer container)
     {
         container.Row(row =>
