@@ -332,7 +332,7 @@ public class TicketService
                 return (false, "Carteira digital não encontrada para o usuário.");
             }
 
-            carteira.Saldo += ticket.Saldo;
+            carteira.Saldo += Convert.ToDecimal(ticket.Saldo);
             await _supabaseClient.From<CarteiraDigital>().Update(carteira);
 
             ticket.Status = "Reembolsado";
