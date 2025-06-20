@@ -157,7 +157,7 @@ public class CarteiraService
                 carteiraRemetente.Saldo -= dto.Valor;
                 carteiraDestinatario.Saldo += dto.Valor;
             }
-            else // pontos
+            else
             {
                 var valorInteiro = (long)dto.Valor;
                 if (carteiraRemetente.Pontos < valorInteiro)
@@ -250,8 +250,8 @@ public class CarteiraService
             var trocasHoje = await _supabaseClient
                 .From<TrocaPontos>()
                 .Filter("usuario_id", Operator.Equals, userId)
-                .Filter("data_troca", Operator.GreaterThanOrEqual, hoje.ToString("O"))
-                .Filter("data_troca", Operator.LessThan, amanha.ToString("O"))
+                .Filter("data_troca", Operator.GreaterThanOrEqual, hoje.ToString("yyyy-MM-dd"))
+                .Filter("data_troca", Operator.LessThan, amanha.ToString("yyyy-MM-dd"))
                 .Get();
 
             if (trocasHoje.Models.Count >= 3)
