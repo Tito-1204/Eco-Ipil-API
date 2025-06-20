@@ -249,7 +249,7 @@ public class CarteiraService
 
             var trocasHoje = await _supabaseClient
                 .From<TrocaPontos>()
-                .Filter("usuario_id", Operator.Equals, userId)
+                .Match(new Dictionary<string, string> { { "usuario_id", userId.ToString() } })
                 .Filter("data_troca", Operator.GreaterThanOrEqual, hoje.ToString("yyyy-MM-dd"))
                 .Filter("data_troca", Operator.LessThan, amanha.ToString("yyyy-MM-dd"))
                 .Get();
