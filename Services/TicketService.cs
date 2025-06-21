@@ -94,7 +94,7 @@ public class TicketService
             };
             
             if (ticket.TipoOperacao == "LevantamentoExpress") {
-                ticket.Status = "Invalidado";
+                ticket.Status = "Pendente";
             }
 
             var insertResponse = await _supabaseClient.From<Ticket>().Insert(ticket);
