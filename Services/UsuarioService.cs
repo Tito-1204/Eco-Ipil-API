@@ -539,7 +539,7 @@ public class UsuarioService
         try
         {
             var recuperacaoResponse = await _supabaseClient.From<RecuperacaoSenha>()
-                .Filter("codigo", Operator.Equals, codigo)
+                .Match(new { codigo = codigo })
                 .Get();
 
             if (recuperacaoResponse.Models == null || !recuperacaoResponse.Models.Any())
@@ -550,13 +550,13 @@ public class UsuarioService
             if (recuperacao.ExpiresAt != null && recuperacao.ExpiresAt < DateTime.UtcNow)
             {
                 await _supabaseClient.From<RecuperacaoSenha>()
-                    .Filter("codigo", Operator.Equals, codigo)
+                    .Match(new { codigo = codigo })
                     .Delete();
                 return (false, "Código expirado");
             }
 
             var usuario = await _supabaseClient.From<Usuario>()
-                .Filter("id", Operator.Equals, recuperacao.UserId)
+                .Match(new { id = recuperacao.UserId })
                 .Single();
 
             if (usuario == null)
@@ -564,11 +564,11 @@ public class UsuarioService
 
             usuario.Senha = BCrypt.Net.BCrypt.HashPassword(novaSenha);
             await _supabaseClient.From<Usuario>()
-                .Filter("id", Operator.Equals, recuperacao.UserId)
+                .Match(new { id = recuperacao.UserId })
                 .Update(usuario);
 
             await _supabaseClient.From<RecuperacaoSenha>()
-                .Filter("codigo", Operator.Equals, codigo)
+                .Match(new { codigo = codigo })
                 .Delete();
 
             return (true, "Senha redefinida com sucesso");
