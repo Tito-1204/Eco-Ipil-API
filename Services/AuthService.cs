@@ -10,6 +10,8 @@ using System.Linq;
 using Supabase.Postgrest.Models;
 using Supabase;
 using Supabase.Gotrue;
+using System.Net.Mail;
+using System.Net;
 
 namespace EcoIpil.API.Services
 {
@@ -233,6 +235,7 @@ namespace EcoIpil.API.Services
                         Console.WriteLine("Tentando inserir usuário sem especificar ID");
                         await client.From<Usuario>().Insert(usuario);
                         Console.WriteLine("Usuário inserido com sucesso");
+                        
                         return (true, "Usuário registrado com sucesso!");
                     }
                     catch (Exception insertEx)
@@ -258,6 +261,7 @@ namespace EcoIpil.API.Services
                                 };
                                 await client.From<Usuario>().Insert(novoUsuario);
                                 Console.WriteLine("Usuário inserido com novo objeto");
+                                
                                 return (true, "Usuário registrado com sucesso!");
                             }
                             catch (Exception altEx)
@@ -269,6 +273,8 @@ namespace EcoIpil.API.Services
                                     usuario.Id = -random.Next(1, 1000000);
                                     await client.From<Usuario>().Insert(usuario);
                                     Console.WriteLine("Usuário inserido com ID negativo");
+                                    
+                                    
                                     return (true, "Usuário registrado com sucesso!");
                                 }
                                 catch (Exception negIdEx)
@@ -294,14 +300,149 @@ namespace EcoIpil.API.Services
             }
         }
 
+        public async Task<(bool success, string message)> SendWelcomeEmail(string email, string nome)
+        {
+            try
+            {
+                var codigo = GenerateVerificationCode();
+                var client = _supabaseService.GetClient();
+                
+                var codigoVerificacao = new CodigoVerificacao
+                {
+                    Email = email,
+                    Codigo = codigo,
+                    Tipo = "welcome",
+                    CriadoEm = DateTime.UtcNow,
+                    ExpiraEm = DateTime.UtcNow.AddHours(24)
+                };
+
+                await client.From<CodigoVerificacao>().Insert(codigoVerificacao);
+
+                var smtpClient = new SmtpClient(_configuration["EmailSettings:SmtpServer"])
+                {
+                    Port = int.Parse(_configuration["EmailSettings:SmtpPort"]),
+                    Credentials = new NetworkCredential(
+                        _configuration["EmailSettings:SenderEmail"],
+                        _configuration["EmailSettings:SenderPassword"]),
+                    EnableSsl = true
+                };
+
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(_configuration["EmailSettings:SenderEmail"], _configuration["EmailSettings:SenderName"]),
+                    Subject = "Bem-vindo ao Eco-Ipil!",
+                    IsBodyHtml = true,
+                    Body = $@"<!DOCTYPE html>
+<html lang='pt'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <style>
+        body {{ font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }}
+        .container {{ max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); overflow: hidden; }}
+        .header {{ background: linear-gradient(90deg, #2ecc71, #27ae60); padding: 20px; text-align: center; }}
+        .header h1 {{ color: #ffffff; font-size: 24px; margin: 0; }}
+        .content {{ padding: 20px; color: #333333; }}
+        .content h2 {{ color: #2ecc71; font-size: 20px; }}
+        .content p {{ font-size: 16px; line-height: 1.6; }}
+        .code {{ background-color: #e0e0e0; padding: 10px; border-radius: 5px; text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 2px; margin: 20px 0; color: #041c34; }}
+        .footer {{ background-color: #041c34; padding: 10px; text-align: center; color: #e0e0e0; font-size: 12px; }}
+        .footer a {{ color: #2ecc71; text-decoration: none; }}
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>Eco-Ipil</h1>
+        </div>
+        <div class='content'>
+            <h2>Olá, {nome}!</h2>
+            <p>Bem-vindo ao <strong>Eco-Ipil</strong>, o teu parceiro na missão de tornar o mundo mais verde! Estamos bué felizes por teres juntado a nossa comunidade de recicladores. 🌍</p>
+            <p>Para confirmar que este e-mail é mesmo teu, usa o código abaixo:</p>
+            <div class='code'>{codigo.Substring(0, 4)}-{codigo.Substring(4, 4)}</div>
+            <p>Este código expira em 24 horas, por isso usa-o logo! Se precisares de ajuda, é só contactar-nos.</p>
+            <p>Juntos, vamos fazer a diferença! 🚀</p>
+        </div>
+        <div class='footer'>
+            <p>&copy; 2025 Eco-Ipil. Todos os direitos reservados.</p>
+            <p><a href='https://eco-ipil.com'>Visita o nosso site</a></p>
+        </div>
+    </div>
+</body>
+</html>"
+                };
+                mailMessage.To.Add(email);
+
+                await smtpClient.SendMailAsync(mailMessage);
+                return (true, "E-mail de boas-vindas enviado com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao enviar e-mail de boas-vindas: {ex.Message}");
+                return (false, $"Erro ao enviar e-mail de boas-vindas: {ex.Message}");
+            }
+        }
+
+        public async Task<(bool success, string message)> VerifyEmailCode(string email, string codigo)
+        {
+            try
+            {
+                email = email?.Trim().ToLower() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(email) || !EmailRegex.IsMatch(email))
+                {
+                    return (false, "Email inválido");
+                }
+
+                if (string.IsNullOrWhiteSpace(codigo) || codigo.Length != 9 || codigo[4] != '-')
+                {
+                    return (false, "Código inválido. Use o formato XXXX-XXXX");
+                }
+
+                var codigoLimpo = codigo.Replace("-", "");
+                var client = _supabaseService.GetClient();
+                var response = await client.From<CodigoVerificacao>()
+                    .Where(c => c.Email == email && c.Codigo == codigoLimpo && c.Tipo == "welcome")
+                    .Get();
+
+                if (!response.Models.Any())
+                {
+                    return (false, "Código inválido ou não encontrado");
+                }
+
+                var codigoVerificacao = response.Models.First();
+                if (codigoVerificacao.ExpiraEm < DateTime.UtcNow)
+                {
+                    return (false, "Código expirado");
+                }
+
+                await client.From<CodigoVerificacao>()
+                    .Where(c => c.Id == codigoVerificacao.Id)
+                    .Delete();
+
+                return (true, "E-mail verificado com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao verificar código: {ex.Message}");
+                return (false, $"Erro ao verificar código: {ex.Message}");
+            }
+        }
+
+        private string GenerateVerificationCode()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            return new string(Enumerable.Repeat(chars, 8)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
         public string GerarToken(Usuario usuario)
         {
             var claims = new List<Claim>
             {
-                // CORREÇÃO: O identificador principal (NameIdentifier) agora é o UserUid (string/uuid).
-                new Claim(ClaimTypes.NameIdentifier, usuario.UserUid ?? ""), 
+                new Claim(ClaimTypes.NameIdentifier, usuario.UserUid ?? ""),
                 new Claim(ClaimTypes.Email, usuario.Email ?? ""),
-                new Claim("id_numerico", usuario.Id.ToString()) // Adicionando o ID numérico como um claim separado
+                new Claim("id_numerico", usuario.Id.ToString())
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key não configurada")));
@@ -345,14 +486,12 @@ namespace EcoIpil.API.Services
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
                 
-                // Prioridade 1: Tentar obter o claim "id_numerico"
                 var userIdClaim = principal.FindFirst("id_numerico")?.Value;
                 if (long.TryParse(userIdClaim, out long userId) && userId > 0)
                 {
                     return userId;
                 }
 
-                // Prioridade 2 (Fallback): Obter o UID e buscar no banco
                 var userUidClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (!string.IsNullOrEmpty(userUidClaim))
                 {

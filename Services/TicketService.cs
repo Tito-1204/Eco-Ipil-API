@@ -12,6 +12,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.IO;
+using EcoIpil.API.Services;
 
 namespace EcoIpil.API.Services;
 
@@ -33,7 +34,7 @@ public class TicketService
         _logger = logger;
         _authService = authService;
     }
-    
+
     private string GenerateTicketCode()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -92,15 +93,17 @@ public class TicketService
                 CreatedAt = DateTime.UtcNow,
                 DataValidade = DateTime.UtcNow.AddDays(7)
             };
-            
-            if (ticket.TipoOperacao == "LevantamentoExpress") {
+
+            if (ticket.TipoOperacao == "LevantamentoExpress")
+            {
                 ticket.Status = "Pendente";
             }
 
             var insertResponse = await _supabaseClient.From<Ticket>().Insert(ticket);
             var insertedTicket = insertResponse.Models.FirstOrDefault();
 
-            if (insertedTicket == null) {
+            if (insertedTicket == null)
+            {
                 return (false, "Falha ao criar o ticket no banco de dados.", null);
             }
 
@@ -146,19 +149,19 @@ public class TicketService
             {
                 query = query.Filter("status", Operator.Equals, status);
             }
-            
+
             if (!string.IsNullOrEmpty(tipoOperacao))
             {
                 query = query.Filter("tipo_operacao", Operator.Equals, tipoOperacao);
             }
-            
+
             query = query.Order("created_at", Ordering.Descending);
 
             var response = await query.Get();
-            
+
             if (response.Models == null)
             {
-                 return (false, "A resposta do banco de dados foi nula.", null);
+                return (false, "A resposta do banco de dados foi nula.", null);
             }
 
             var tickets = response.Models.Select(t => new TicketResponseDTO
@@ -246,16 +249,16 @@ public class TicketService
                 return (false, validationResult.message, null);
             }
             long userId = validationResult.userId;
-            
+
             var ticket = await _supabaseClient.From<Ticket>()
                 .Where(t => t.TicketCode == ticketCode && t.UsuarioId == userId)
                 .Single();
-            
+
             if (ticket == null)
             {
                 return (false, "Ticket não encontrado ou não pertence ao usuário.", null);
             }
-            
+
             if (ticket.TipoOperacao != "PagamentoMao")
             {
                 return (false, "Apenas tickets de 'Pagamento em Mão' podem ser exportados como PDF.", null);
@@ -266,15 +269,15 @@ public class TicketService
             {
                 return (false, "Dados do usuário não encontrados.", null);
             }
-            
+
             byte[] pdfBytes = Document.Create(container =>
             {
                 container.Page(page =>
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
-                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Lato")); 
-                    
+                    page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Lato"));
+
                     page.Header().Element(ComposeHeader);
                     page.Content().Element(x => ComposeContent(x, ticket, usuario));
                     page.Footer().Element(ComposeFooter);
@@ -289,7 +292,7 @@ public class TicketService
             return (false, $"Erro ao gerar PDF: {ex.Message}", null);
         }
     }
-    
+
     public async Task<(bool success, string message)> ReembolsarTicket(string token, long ticketId)
     {
         try
@@ -310,12 +313,12 @@ public class TicketService
             {
                 return (false, "Ticket não encontrado ou não pertence ao usuário.");
             }
-            
+
             if (ticket.Status == "Reembolsado" || ticket.Status == "Pago")
             {
                 return (false, $"Ticket com status '{ticket.Status}' não pode ser reembolsado.");
             }
-            
+
             var tempoDesdeCriacao = DateTime.UtcNow - ticket.CreatedAt;
             if (tempoDesdeCriacao.TotalHours <= 2)
             {
@@ -359,7 +362,7 @@ public class TicketService
             row.ConstantItem(120).AlignRight().Text(DateTime.Now.ToString("dd/MM/yyyy"));
         });
     }
-    
+
     private void ComposeContent(IContainer container, Ticket ticket, Usuario usuario)
     {
         container.PaddingVertical(20).Column(col =>
@@ -371,7 +374,7 @@ public class TicketService
                 c.Item().Text(txt => { txt.Span("Email: ").SemiBold(); txt.Span(usuario.Email); });
                 c.Item().Text(txt => { txt.Span("ID do Utilizador: ").SemiBold(); txt.Span(usuario.Id.ToString()); });
             });
-            
+
             col.Item().PaddingTop(20).Component(new TicketInfoSection("Detalhes do Ticket"));
             col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
             {
@@ -382,7 +385,7 @@ public class TicketService
                 c.Item().Text(txt => { txt.Span("Data de Validade: ").SemiBold(); txt.Span($"{ticket.DataValidade:dd/MM/yyyy HH:mm}"); });
                 c.Item().Text(txt => { txt.Span("Status: ").SemiBold(); txt.Span(ticket.Status).FontColor(Colors.Green.Darken2).Bold(); });
             });
-            
+
             col.Item().PaddingTop(20).Component(new TicketInfoSection("Instruções"));
             col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Background(Colors.Blue.Lighten5).Padding(10).Column(c =>
             {
@@ -393,7 +396,7 @@ public class TicketService
                 c.Item().Text("4. Após a validação, o valor será entregue em mãos.");
                 c.Item().Text("5. Este ticket é de uso único, pessoal e intransmissível.");
             });
-            
+
             col.Item().PaddingTop(20).BorderTop(1).BorderColor(Colors.Grey.Medium).PaddingTop(10).Column(c =>
             {
                 c.Item().Text(text => text.Span("Avisos Importantes:").Bold());
@@ -403,13 +406,13 @@ public class TicketService
             });
         });
     }
-    
+
     private void ComposeFooter(IContainer container)
     {
         container.AlignCenter().Text(text =>
         {
             text.DefaultTextStyle(x => x.FontSize(10));
-            
+
             text.Span("EcoIpil © ").SemiBold();
             text.Span($"{DateTime.Now.Year} - Agradecemos por ajudar o ambiente! Página ");
             text.CurrentPageNumber();

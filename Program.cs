@@ -109,6 +109,7 @@ builder.Services.AddHostedService<EcopontoNotificacaoSchedulerService>();
 builder.Services.AddHostedService<RecompensaNotificacaoSchedulerService>(); 
 builder.Services.AddHostedService<CampanhaVerificationService>();
 builder.Services.AddSingleton<SupabaseService>();
+builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHttpContextAccessor();
 
 // Adicionar suporte a sessões

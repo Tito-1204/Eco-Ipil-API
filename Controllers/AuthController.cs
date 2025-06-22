@@ -45,4 +45,46 @@ public class AuthController : ControllerBase
             message
         });
     }
-} 
+
+    [HttpPost("send-welcome-email")]
+    public async Task<IActionResult> SendWelcomeEmail([FromBody] WelcomeEmailDTO welcomeEmailDto)
+    {
+        var (success, message) = await _authService.SendWelcomeEmail(welcomeEmailDto.Email, welcomeEmailDto.Nome);
+
+        if (!success)
+            return BadRequest(new { status = false, message });
+
+        return Ok(new
+        {
+            status = true,
+            message
+        });
+    }
+
+    [HttpPost("verify-email-code")]
+    public async Task<IActionResult> VerifyEmailCode([FromBody] VerifyEmailCodeDTO verifyEmailCodeDto)
+    {
+        var (success, message) = await _authService.VerifyEmailCode(verifyEmailCodeDto.Email, verifyEmailCodeDto.Codigo);
+
+        if (!success)
+            return BadRequest(new { status = false, message });
+
+        return Ok(new
+        {
+            status = true,
+            message
+        });
+    }
+}
+
+public class WelcomeEmailDTO
+{
+    public string Email { get; set; }
+    public string Nome { get; set; }
+}
+
+public class VerifyEmailCodeDTO
+{
+    public string Email { get; set; }
+    public string Codigo { get; set; }
+}
