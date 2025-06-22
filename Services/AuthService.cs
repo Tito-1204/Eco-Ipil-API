@@ -401,7 +401,12 @@ namespace EcoIpil.API.Services
                 var codigoLimpo = codigo.Replace("-", "");
                 var client = _supabaseService.GetClient();
                 var response = await client.From<CodigoVerificacao>()
-                    .Where(c => c.Email == email && c.Codigo == codigoLimpo && c.Tipo == "welcome")
+                    .Match(new Dictionary<string, string>
+                    {
+                        { "email", email },
+                        { "codigo", codigoLimpo },
+                        { "tipo", "welcome" }
+                    })
                     .Get();
 
                 if (!response.Models.Any())
