@@ -33,7 +33,6 @@ public class NotificacaoService
         _configuration = configuration;
     }
 
-    // Método auxiliar para enviar emails
     public async Task EnviarEmailNotificacao(string email, string mensagem, string tipo)
     {
         try
@@ -80,7 +79,7 @@ public class NotificacaoService
                         </div>
                         <div class=""footer"">
                             <p>Precisa de ajuda? <a href=""mailto:suporte@eco-ipil.com"">Entre em contato com o suporte</a></p>
-                            <p>&copy; 2025 EcoIpil. Todos os direitos reservados.</p>
+                            <p>© 2025 EcoIpil. Todos os direitos reservados.</p>
                         </div>
                     </div>
                 </body>
@@ -92,7 +91,7 @@ public class NotificacaoService
             {
                 var smtpServer = _configuration["EmailSettings:SmtpServer"];
                 var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
-                var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587; // Valor padrão se nulo
+                var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
                 var senderEmail = _configuration["EmailSettings:SenderEmail"];
                 var senderPassword = _configuration["EmailSettings:SenderPassword"];
 
@@ -114,7 +113,7 @@ public class NotificacaoService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao enviar email para {Email}: {Message}", email, ex.Message);
-            throw; // Opcional: rethrow para depuração
+            throw;
         }
     }
 
@@ -137,44 +136,17 @@ public class NotificacaoService
 
             await _supabaseService.GetClient().From<Notificacao>().Insert(notificacao);
 
-            // Verificar preferências de notificação por email com robustez
             if (usuario.Preferencias != null)
             {
-                _logger.LogInformation("Preferências encontradas para o usuário {UserId}: {Preferencias}", usuarioId, JsonSerializer.Serialize(usuario.Preferencias));
-
-                // Converter para dicionário de forma segura
                 var preferencias = usuario.Preferencias as Dictionary<string, bool>;
-                if (preferencias == null)
+                if (preferencias != null && preferencias.TryGetValue("notificacoes_email", out bool emailEnabled) && emailEnabled)
                 {
-                    _logger.LogWarning("Preferências não são um Dictionary<string, bool> para o usuário {UserId}", usuarioId);
-                    return (true, "Notificação criada, mas preferências inválidas");
-                }
-
-                // Verificar a chave "notificacoes_email"
-                if (preferencias.TryGetValue("notificacoes_email", out bool emailEnabled))
-                {
-                    if (emailEnabled)
-                    {
-                        _logger.LogInformation("Enviando email para {Email}", usuario.Email);
-                        await EnviarEmailNotificacao(usuario.Email, mensagem, tipo ?? "Notificação");
-                        await Task.Delay(2000);
-                    }
-                    else
-                    {
-                        _logger.LogInformation("Notificação por email desativada para o usuário {UserId}", usuarioId);
-                    }
-                }
-                else
-                {
-                    _logger.LogInformation("Chave 'notificacoes_email' não encontrada, assumindo false para o usuário {UserId}", usuarioId);
+                    await EnviarEmailNotificacao(usuario.Email, mensagem, tipo ?? "Notificação");
+                    await Task.Delay(2000);
                 }
             }
-            else
-            {
-                _logger.LogInformation("Preferências de notificação não definidas (nulas) para o usuário {UserId}", usuarioId);
-            }
 
-            _logger.LogInformation("Notificação pessoal criada para o usuário {UserId} com mensagem: {Mensagem}", usuarioId, mensagem);
+            _logger.LogInformation("Notificação pessoal criada para o usuário {UserId}", usuarioId);
             return (true, "Notificação pessoal criada com sucesso");
         }
         catch (Exception ex)
@@ -200,60 +172,15 @@ public class NotificacaoService
 
             await _supabaseService.GetClient().From<Notificacao>().Insert(notificacao);
 
-            // Enviar email para todos os usuários com "notificacoes_email": true
             var usuarios = await _supabaseService.GetClient().From<Usuario>().Select("*").Get();
             foreach (var usuario in usuarios.Models)
             {
-                if (usuario.Preferencias != null)
+                if (usuario.Preferencias is IDictionary<string, object> preferencias &&
+                    preferencias.TryGetValue("notificacoes_email", out var emailEnabledObj) &&
+                    emailEnabledObj is bool emailEnabled && emailEnabled)
                 {
-                    _logger.LogInformation("Preferências encontradas para o usuário {UserId}: {Preferencias}", usuario.Id, JsonSerializer.Serialize(usuario.Preferencias));
-
-                    // Tentar converter as preferências para um dicionário genérico
-                    IDictionary<string, object>? preferencias = null;
-                    if (usuario.Preferencias is IDictionary<string, object> dictObj)
-                    {
-                        preferencias = dictObj;
-                    }
-                    else if (usuario.Preferencias is IDictionary<string, bool> dictBool)
-                    {
-                        preferencias = dictBool.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
-                    }
-                    else
-                    {
-                        // Se não for um dicionário, tentar desserializar como JSON
-                        try
-                        {
-                            var jsonString = JsonSerializer.Serialize(usuario.Preferencias);
-                            preferencias = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Erro ao desserializar preferências para o usuário {UserId}: {Preferencias}", usuario.Id, usuario.Preferencias?.ToString());
-                        }
-                    }
-
-                    if (preferencias != null && preferencias.TryGetValue("notificacoes_email", out var emailEnabledObj))
-                    {
-                        bool emailEnabled = false;
-                        if (emailEnabledObj is bool boolValue)
-                        {
-                            emailEnabled = boolValue;
-                        }
-                        else if (emailEnabledObj is string stringValue)
-                        {
-                            emailEnabled = stringValue.ToLower() == "true";
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Valor de notificacoes_email não é booleano nem string para o usuário {UserId}: {Value}", usuario.Id, emailEnabledObj?.ToString());
-                        }
-
-                        if (emailEnabled)
-                        {
-                            await EnviarEmailNotificacao(usuario.Email, mensagem, tipo ?? "Notificação Geral");
-                            await Task.Delay(3000);
-                        }
-                    }
+                    await EnviarEmailNotificacao(usuario.Email, mensagem, tipo ?? "Notificação Geral");
+                    await Task.Delay(3000);
                 }
             }
 
@@ -293,116 +220,55 @@ public class NotificacaoService
             }
             
             long userId = validatedUserId.Value;
-
-            var todasNotificacoes = new List<Notificacao>();
             var dataAtual = DateTime.UtcNow;
-            var dataAtualIso = dataAtual.ToString("o"); // Formato ISO 8601 (ex.: 2025-03-27T12:34:56.789Z)
-            _logger.LogInformation("Data atual usada para filtro: {DataAtual}", dataAtualIso);
 
-            // 1. Buscar notificações gerais usando a função get_notificacoes_gerais
-            var responseGerais = await _supabaseService.GetClient()
-                .Rpc("get_notificacoes_gerais", new { p_data_atual = dataAtualIso });
-
-            // Usar diretamente o Content, que já é uma string
-            string? contentGerais = responseGerais.Content;
-
-            // Desserializar a resposta bruta em uma lista de Notificacao
-            var notificacoesGerais = string.IsNullOrEmpty(contentGerais)
-                ? new List<Notificacao>()
-                : JsonSerializer.Deserialize<List<Notificacao>>(contentGerais, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
-
-            if (!string.IsNullOrEmpty(lida))
+            var rpcParams = new Dictionary<string, object>
             {
-                if (bool.TryParse(lida, out bool isLida))
-                {
-                    if (isLida)
-                    {
-                        // Notificações gerais que o usuário já leu
-                        var notificacoesLidas = await _supabaseService.GetClient().From<NotificacaoLida>()
-                            .Filter("usuario_id", Operator.Equals, userId)
-                            .Get();
+                { "p_usuario_id", userId },
+                { "p_data_atual", dataAtual.ToString("o") }
+            };
 
-                        if (notificacoesLidas.Models.Any())
-                        {
-                            var notificacaoIds = notificacoesLidas.Models.Select(nl => nl.NotificacaoId).ToList();
-                            var notificacoesLidasFiltradas = notificacoesGerais
-                                .Where(n => notificacaoIds.Contains(n.Id))
-                                .ToList();
-                            todasNotificacoes.AddRange(notificacoesLidasFiltradas);
-                        }
-                    }
-                    else
-                    {
-                        // Notificações gerais que o usuário ainda não leu
-                        var notificacoesLidas = await _supabaseService.GetClient().From<NotificacaoLida>()
-                            .Filter("usuario_id", Operator.Equals, userId)
-                            .Get();
+            if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLida))
+            {
+                rpcParams.Add("p_lida", isLida);
+            }
+            else if (!string.IsNullOrEmpty(lida))
+            {
+                return (false, "Parâmetro 'lida' inválido. Use 'true' ou 'false'.", new List<NotificacaoResponseDTO>());
+            }
 
-                        if (notificacoesLidas.Models.Any())
-                        {
-                            var notificacaoIds = notificacoesLidas.Models.Select(nl => nl.NotificacaoId).ToList();
-                            var notificacoesNaoLidas = notificacoesGerais
-                                .Where(n => !notificacaoIds.Contains(n.Id))
-                                .ToList();
-                            todasNotificacoes.AddRange(notificacoesNaoLidas);
-                        }
-                        else
-                        {
-                            todasNotificacoes.AddRange(notificacoesGerais);
-                        }
-                    }
-                }
-                else
+            var response = await _supabaseService.GetClient().Rpc("get_todas_notificacoes_para_usuario", rpcParams);
+
+            if (response.ResponseMessage.IsSuccessStatusCode)
+            {
+                var notificacoes = JsonSerializer.Deserialize<List<Notificacao>>(response.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
+
+                var notificacoesDTO = notificacoes.Select(n => new NotificacaoResponseDTO
                 {
-                    return (false, "Parâmetro 'lida' deve ser 'true' ou 'false'", new List<NotificacaoResponseDTO>());
+                    Id = n.Id,
+                    Mensagem = n.Mensagem,
+                    Tipo = n.Tipo,
+                    Lidos = n.UsuarioId.HasValue ? (int)n.Lidos : (n.NotificacoesLidas?.Any(nl => nl.UsuarioId == userId) ?? false ? 1 : 0),
+                    DataExpiracao = n.DataExpiracao
+                }).OrderByDescending(n => n.Lidos == 0).ThenByDescending(n => n.Id).ToList();
+
+                if (pagina.HasValue && limite.HasValue)
+                {
+                    notificacoesDTO = notificacoesDTO.Skip((pagina.Value - 1) * limite.Value).Take(limite.Value).ToList();
                 }
+
+                return (true, "Notificações obtidas com sucesso", notificacoesDTO);
             }
             else
             {
-                todasNotificacoes.AddRange(notificacoesGerais);
+                _logger.LogError("Erro na chamada RPC get_todas_notificacoes_para_usuario: {StatusCode} {Content}", response.ResponseMessage.StatusCode, response.Content);
+                return (false, "Erro ao buscar notificações do banco de dados.", new List<NotificacaoResponseDTO>());
             }
-
-            // 2. Buscar notificações pessoais usando a função get_notificacoes_pessoais
-            bool? lidaParam = string.IsNullOrEmpty(lida) ? null : bool.Parse(lida);
-            var responsePessoais = await _supabaseService.GetClient()
-                .Rpc("get_notificacoes_pessoais", new { p_usuario_id = userId, p_data_atual = dataAtualIso, p_lida = lidaParam });
-
-            // Usar diretamente o Content, que já é uma string
-            string? contentPessoais = responsePessoais.Content;
-
-            // Desserializar a resposta bruta em uma lista de Notificacao
-            var notificacoesPessoais = string.IsNullOrEmpty(contentPessoais)
-                ? new List<Notificacao>()
-                : JsonSerializer.Deserialize<List<Notificacao>>(contentPessoais, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
-
-            todasNotificacoes.AddRange(notificacoesPessoais);
-
-            // 3. Ordenar por created_at (mais recente primeiro) e aplicar paginação
-            todasNotificacoes = todasNotificacoes.OrderByDescending(n => n.CreatedAt).ToList();
-
-            if (pagina.HasValue && limite.HasValue)
-            {
-                int from = (pagina.Value - 1) * limite.Value;
-                int to = from + limite.Value;
-                todasNotificacoes = todasNotificacoes.Skip(from).Take(limite.Value).ToList();
-            }
-
-            // 4. Mapear para DTO
-            var notificacoesDTO = todasNotificacoes.Select(n => new NotificacaoResponseDTO
-            {
-                Id = n.Id,
-                Mensagem = n.Mensagem,
-                Tipo = n.Tipo,
-                Lidos = (int)n.Lidos,
-                DataExpiracao = n.DataExpiracao
-            }).ToList();
-
-            return (true, "Notificações obtidas com sucesso", notificacoesDTO);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao listar notificações");
-            return (false, "Erro ao listar notificações", new List<NotificacaoResponseDTO>());
+            return (false, "Erro interno ao listar notificações", new List<NotificacaoResponseDTO>());
         }
     }
 
@@ -411,65 +277,32 @@ public class NotificacaoService
         try
         {
             var (success, message, validatedUserId) = await ValidateToken(token);
-            if (!success || !validatedUserId.HasValue)
-            {
-                return (false, message);
-            }
+            if (!success || !validatedUserId.HasValue) return (false, message);
             
             long userId = validatedUserId.Value;
 
-            var notificacao = await _supabaseService.GetClient().From<Notificacao>()
-                .Filter("id", Operator.Equals, notificacaoId)
-                .Single();
-
-            if (notificacao == null)
-            {
-                return (false, "Notificação não encontrada");
-            }
+            var notificacao = await _supabaseService.GetClient().From<Notificacao>().Filter("id", Operator.Equals, notificacaoId).Single();
+            if (notificacao == null) return (false, "Notificação não encontrada");
 
             if (notificacao.UsuarioId.HasValue)
             {
-                if (notificacao.UsuarioId != userId)
+                if (notificacao.UsuarioId != userId) return (false, "Notificação não pertence ao usuário");
+
+                if (notificacao.Lidos == 0)
                 {
-                    return (false, "Notificação não pertence ao usuário");
+                    await _supabaseService.GetClient().From<Notificacao>().Where(x => x.Id == notificacaoId).Set(x => x.Lidos, 1).Update();
                 }
-
-                notificacao.Lidos++;
-                await _supabaseService.GetClient().From<Notificacao>()
-                    .Where(x => x.Id == notificacaoId)
-                    .Set(x => x.Lidos, notificacao.Lidos)
-                    .Update();
-
-                return (true, "Notificação marcada como lida com sucesso");
             }
             else
             {
-                var leituraExistente = await _supabaseService.GetClient().From<NotificacaoLida>()
-                    .Filter("usuario_id", Operator.Equals, userId)
-                    .Filter("notificacao_id", Operator.Equals, notificacaoId)
-                    .Single();
-
-                if (leituraExistente != null)
+                var leituraExistente = await _supabaseService.GetClient().From<NotificacaoLida>().Filter("usuario_id", Operator.Equals, userId).Filter("notificacao_id", Operator.Equals, notificacaoId).Get();
+                if (!leituraExistente.Models.Any())
                 {
-                    return (false, "Você já marcou esta notificação como lida");
+                    var novaLeitura = new NotificacaoLida { UsuarioId = userId, NotificacaoId = notificacaoId, DataLeitura = DateTime.UtcNow };
+                    await _supabaseService.GetClient().From<NotificacaoLida>().Insert(novaLeitura);
                 }
-
-                var novaLeitura = new NotificacaoLida
-                {
-                    UsuarioId = userId,
-                    NotificacaoId = notificacaoId,
-                    DataLeitura = DateTime.UtcNow
-                };
-                await _supabaseService.GetClient().From<NotificacaoLida>().Insert(novaLeitura);
-
-                notificacao.Lidos++;
-                await _supabaseService.GetClient().From<Notificacao>()
-                    .Where(x => x.Id == notificacaoId)
-                    .Set(x => x.Lidos, notificacao.Lidos)
-                    .Update();
-
-                return (true, "Notificação geral marcada como lida com sucesso");
             }
+            return (true, "Notificação marcada como lida com sucesso");
         }
         catch (Exception ex)
         {
@@ -483,30 +316,33 @@ public class NotificacaoService
         try
         {
             var (success, message, validatedUserId) = await ValidateToken(token);
-            if (!success || !validatedUserId.HasValue)
-            {
-                return (false, message);
-            }
+            if (!success || !validatedUserId.HasValue) return (false, message);
             
             long userId = validatedUserId.Value;
 
-            var notificacoes = await _supabaseService.GetClient().From<Notificacao>()
-                .Filter("usuario_id", Operator.Equals, userId)
-                .Get();
-
-            if (notificacoes.Models == null || !notificacoes.Models.Any())
+            var rpcParams = new Dictionary<string, object>
             {
-                return (true, "Nenhuma notificação para marcar como lida");
-            }
+                { "p_usuario_id", userId },
+                { "p_data_atual", DateTime.UtcNow.ToString("o") },
+                { "p_lida", false }
+            };
 
-            foreach (var notificacao in notificacoes.Models)
+            var response = await _supabaseService.GetClient().Rpc("get_todas_notificacoes_para_usuario", rpcParams);
+            if (!response.ResponseMessage.IsSuccessStatusCode)
+                return (false, "Erro ao buscar notificações para marcar como lidas.");
+
+            var notificacoesNaoLidas = JsonSerializer.Deserialize<List<Notificacao>>(response.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
+
+            foreach (var notificacao in notificacoesNaoLidas)
             {
-                if (notificacao.Lidos == 0)
+                if (notificacao.UsuarioId.HasValue)
                 {
-                    await _supabaseService.GetClient().From<Notificacao>()
-                        .Where(x => x.Id == notificacao.Id)
-                        .Set(x => x.Lidos, 1)
-                        .Update();
+                    await _supabaseService.GetClient().From<Notificacao>().Where(x => x.Id == notificacao.Id).Set(x => x.Lidos, 1).Update();
+                }
+                else
+                {
+                    var novaLeitura = new NotificacaoLida { UsuarioId = userId, NotificacaoId = notificacao.Id, DataLeitura = DateTime.UtcNow };
+                    await _supabaseService.GetClient().From<NotificacaoLida>().Insert(novaLeitura);
                 }
             }
 
@@ -518,5 +354,4 @@ public class NotificacaoService
             return (false, "Erro ao marcar todas as notificações como lidas");
         }
     }
-
 }
