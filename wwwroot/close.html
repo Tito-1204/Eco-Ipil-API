@@ -1,38 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Close Window</title>
+    <title>Fechando...</title>
     <script>
-        // Obter os parâmetros da URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const status = urlParams.get('status');
-        const statusUsuario = urlParams.get('status_usuario');
-        const accessToken = urlParams.get('access_token');
-        const jwtToken = urlParams.get('jwt_token');
-        const message = urlParams.get('message');
-        const userId = urlParams.get('userId');
-
-        // Enviar mensagem para o opener (janela pai) se existir
-        if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({
-                status: status === 'true',
-                status_usuario: statusUsuario,
-                access_token: accessToken,
-                jwt_token: jwtToken,
-                message: decodeURIComponent(message),
-                userId: userId
-            }, 'http://localhost:5173/'); // Substitua pelo domínio do frontend
-        }
-
-        // Fechar a janela após um pequeno atraso para garantir que a mensagem seja enviada
-        setTimeout(() => {
-            window.close();
-        }, 500);
+        window.onload = function() {
+            if (window.opener) {
+                window.opener.postMessage({
+                    status: window.location.search.includes('status=true') ? true : false,
+                    status_usuario: window.location.search.includes('status_usuario=pendente') ? 'pendente' : 'ativo',
+                    access_token: new URLSearchParams(window.location.search).get('access_token') || '',
+                    jwt_token: new URLSearchParams(window.location.search).get('jwt_token') || '',
+                    message: new URLSearchParams(window.location.search).get('message') || '',
+                    userId: new URLSearchParams(window.location.search).get('userId') || ''
+                }, 'https://eco-ipil-api-production.up.railway.app');
+                window.close();
+            }
+        };
     </script>
 </head>
 <body>
-    <p>Fechando a janela...</p>
+    Fechando a janela...
 </body>
 </html>
