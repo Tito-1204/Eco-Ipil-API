@@ -8,6 +8,7 @@ using Supabase;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text;
+
 namespace EcoIpil.API.Controllers;
 
 [ApiController]
@@ -64,7 +65,7 @@ public class UsuariosController : ControllerBase
             HttpContext.Session.SetString("code_verifier", codeVerifier);
             HttpContext.Session.SetString("oauth_state", state);
 
-            var redirectUri = $"https://eco-ipil-api-production.up.railway.app/api/v1/usuarios/google-callback?custom_state={Uri.EscapeDataString(state)}";
+            var redirectUri = $"http://localhost:5173/api/v1/usuarios/google-callback?custom_state={Uri.EscapeDataString(state)}";
 
             _logger.LogInformation("Iniciando login com Google usando o cliente Supabase, redirectUri: {RedirectUri}", redirectUri);
 
@@ -103,33 +104,33 @@ public class UsuariosController : ControllerBase
             if (!string.IsNullOrEmpty(error))
             {
                 _logger.LogError("Erro no callback do Google: {Error}, Descrição: {ErrorDescription}", error, error_description);
-                return BadRequest(new { status = false, message = "Erro no fluxo de autenticação", details = new { error, error_description } });
+                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Erro no fluxo de autenticação")}");
             }
 
             if (string.IsNullOrEmpty(code))
             {
                 _logger.LogWarning("Código de autorização ausente no callback do Google");
-                return BadRequest(new { status = false, message = "Código de autorização ausente" });
+                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Código de autorização ausente")}");
             }
 
             if (string.IsNullOrEmpty(custom_state))
             {
                 _logger.LogWarning("Parâmetro custom_state ausente no callback do Google");
-                return BadRequest(new { status = false, message = "Parâmetro custom_state ausente" });
+                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Parâmetro custom_state ausente")}");
             }
 
             var storedState = HttpContext.Session.GetString("oauth_state");
             if (string.IsNullOrEmpty(storedState) || storedState != custom_state)
             {
                 _logger.LogWarning("Estado OAuth inválido. Custom state recebido: {CustomState}, State armazenado: {StoredState}", custom_state, storedState);
-                return BadRequest(new { status = false, message = "Estado OAuth inválido. Possível ataque CSRF." });
+                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Estado OAuth inválido. Possível ataque CSRF.")}");
             }
 
             var codeVerifier = HttpContext.Session.GetString("code_verifier");
             if (string.IsNullOrEmpty(codeVerifier))
             {
                 _logger.LogWarning("Code verifier não encontrado na sessão");
-                return BadRequest(new { status = false, message = "Code verifier não encontrado na sessão" });
+                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Code verifier não encontrado na sessão")}");
             }
 
             _logger.LogInformation("Code verifier recuperado: {CodeVerifier}", codeVerifier);
@@ -140,7 +141,7 @@ public class UsuariosController : ControllerBase
             if (sessionResponse == null || string.IsNullOrEmpty(sessionResponse.AccessToken))
             {
                 _logger.LogWarning("Falha ao trocar o código por um token de acesso usando o cliente Supabase");
-                return BadRequest(new { status = false, message = "Falha ao trocar o código por um token de acesso usando o cliente Supabase" });
+                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Falha ao trocar o código por um token de acesso")}");
             }
 
             var accessToken = sessionResponse.AccessToken;
@@ -152,7 +153,7 @@ public class UsuariosController : ControllerBase
             if (user == null)
             {
                 _logger.LogWarning("Token inválido ou usuário não encontrado");
-                return BadRequest(new { status = false, message = "Token inválido ou usuário não encontrado" });
+                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Token inválido ou usuário não encontrado")}");
             }
 
             var usuarioExistente = await _supabaseClient
@@ -180,15 +181,7 @@ public class UsuariosController : ControllerBase
 
                 var token = _authService.GerarToken(novoUsuario);
                 _logger.LogInformation("Novo usuário criado: {UserId}, Email: {Email}", novoUsuario.Id, novoUsuario.Email);
-                return Ok(new
-                {
-                    status = true,
-                    message = "Usuário criado. Complete seu perfil com telefone, senha e data de nascimento.",
-                    userId = novoUsuario.Id,
-                    status_usuario = "pendente",
-                    access_token = accessToken,
-                    jwt_token = token
-                });
+                return Redirect($"http://localhost:5173/complete-profile?status=true&message={Uri.EscapeDataString("Usuário criado. Complete seu perfil com telefone, senha e data de nascimento.")}&userId={novoUsuario.Id}&status_usuario=pendente&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}");
             }
             else
             {
@@ -196,22 +189,15 @@ public class UsuariosController : ControllerBase
                 await _supabaseClient.From<Usuario>().Update(usuarioExistente);
 
                 var token = _authService.GerarToken(usuarioExistente);
+                // localStorage.setItem('authToken', token); // Removido: não é válido em C#
                 _logger.LogInformation("Login realizado com sucesso para usuário: {UserId}, Email: {Email}", usuarioExistente.Id, usuarioExistente.Email);
-                return Ok(new
-                {
-                    status = true,
-                    message = "Login realizado com sucesso",
-                    userId = usuarioExistente.Id,
-                    status_usuario = "ativo",
-                    access_token = accessToken,
-                    jwt_token = token
-                });
+                return Redirect($"http://localhost:5173/dashboard?status=true&message={Uri.EscapeDataString("Login realizado com sucesso")}&userId={usuarioExistente.Id}&status_usuario=ativo&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro no callback do Google");
-            return StatusCode(500, new { status = false, message = $"Erro no callback: {ex.Message}" });
+            return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString($"Erro no callback: {ex.Message}")}");
         }
     }
 
