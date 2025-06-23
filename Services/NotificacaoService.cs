@@ -224,7 +224,6 @@ public class NotificacaoService
             
             var todasNotificacoes = new List<Notificacao>();
 
-            // 1. Busca todas as notificações pessoais para o usuário
             var notificacoesPessoaisResponse = await _supabaseService.GetClient().From<Notificacao>()
                 .Filter("usuario_id", Operator.Equals, userId)
                 .Get();
@@ -233,7 +232,6 @@ public class NotificacaoService
                 todasNotificacoes.AddRange(notificacoesPessoaisResponse.Models);
             }
 
-            // 2. Busca todas as notificações gerais, incluindo as leituras
             var notificacoesGeraisResponse = await _supabaseService.GetClient().From<Notificacao>()
                 .Select("*,notificacoes_lidas(*)")
                 .Filter<object>("usuario_id", Operator.Is, null)
@@ -243,14 +241,12 @@ public class NotificacaoService
                 todasNotificacoes.AddRange(notificacoesGeraisResponse.Models);
             }
 
-            // 3. Filtra em memória (C#) para remover as expiradas
             var notificacoesAtivas = todasNotificacoes
                 .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
                 .ToList();
             
             IEnumerable<Notificacao> notificacoesFiltradas = notificacoesAtivas;
 
-            // 4. Filtra por status "lida" se o parâmetro foi passado
             if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLida))
             {
                 if (isLida)
@@ -269,19 +265,16 @@ public class NotificacaoService
                 }
             }
 
-            // 5. Ordena o resultado final
             var notificacoesOrdenadas = notificacoesFiltradas
                 .OrderByDescending(n => (n.UsuarioId.HasValue ? n.Lidos == 0 : !n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId)))
                 .ThenByDescending(n => n.CreatedAt)
                 .ToList();
             
-            // 6. Aplica paginação
             if (pagina.HasValue && limite.HasValue)
             {
                 notificacoesOrdenadas = notificacoesOrdenadas.Skip((pagina.Value - 1) * limite.Value).Take(limite.Value).ToList();
             }
 
-            // 7. Mapeia para o DTO de resposta
             var notificacoesDTO = notificacoesOrdenadas.Select(n => new NotificacaoResponseDTO
             {
                 Id = n.Id,
