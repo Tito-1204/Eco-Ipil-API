@@ -181,7 +181,7 @@ public class UsuariosController : ControllerBase
 
                 var token = _authService.GerarToken(novoUsuario);
                 _logger.LogInformation("Novo usuário criado: {UserId}, Email: {Email}", novoUsuario.Id, novoUsuario.Email);
-                return Redirect($"http://localhost:5173/complete-profile?status=true&message={Uri.EscapeDataString("Usuário criado. Complete seu perfil com telefone, senha e data de nascimento.")}&userId={novoUsuario.Id}&status_usuario=pendente&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}");
+                return Redirect($"http://localhost:5173/complete-profile?status=true&message={Uri.EscapeDataString("Usuário criado. Complete seu perfil com telefone, senha e data de nascimento.")}&userId={novoUsuario.Id}&status_usuario=pendente&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email ?? "")}");
             }
             else
             {
@@ -190,7 +190,7 @@ public class UsuariosController : ControllerBase
 
                 var token = _authService.GerarToken(usuarioExistente);
                 _logger.LogInformation("Login realizado com sucesso para usuário: {UserId}, Email: {Email}", usuarioExistente.Id, usuarioExistente.Email);
-                return Redirect($"http://localhost:5173/login?status=true&message={Uri.EscapeDataString("Usuário já possui conta. Faça login com email e senha.")}&email={Uri.EscapeDataString(user.Email ?? "")}");
+                return Redirect($"http://localhost:5173/login?status=true&message={Uri.EscapeDataString("Usuário já possui conta. Faça login com email e senha.")}&email={Uri.EscapeDataString(user.Email ?? "")}&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}");
             }
         }
         catch (Exception ex)
