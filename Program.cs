@@ -135,8 +135,7 @@ builder.Services.AddCors(options =>
 });
 
 // Configuração da porta para o Railway
-var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+builder.WebHost.UseUrls($"http://0.0.0.0:3000");
 
 var app = builder.Build();
 
