@@ -65,7 +65,8 @@ public class UsuariosController : ControllerBase
             HttpContext.Session.SetString("code_verifier", codeVerifier);
             HttpContext.Session.SetString("oauth_state", state);
 
-            var redirectUri = $"http://localhost:5173/api/v1/usuarios/google-callback?custom_state={Uri.EscapeDataString(state)}";
+            var frontendUrl = _configuration["FRONTEND_URL"] ?? "http://localhost:5173";
+            var redirectUri = $"{frontendUrl}/api/v1/usuarios/google-callback?custom_state={Uri.EscapeDataString(state)}";
 
             _logger.LogInformation("Iniciando login com Google usando o cliente Supabase, redirectUri: {RedirectUri}", redirectUri);
 
@@ -104,33 +105,33 @@ public class UsuariosController : ControllerBase
             if (!string.IsNullOrEmpty(error))
             {
                 _logger.LogError("Erro no callback do Google: {Error}, Descrição: {ErrorDescription}", error, error_description);
-                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Erro no fluxo de autenticação")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString("Erro no fluxo de autenticação")}");
             }
 
             if (string.IsNullOrEmpty(code))
             {
                 _logger.LogWarning("Código de autorização ausente no callback do Google");
-                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Código de autorização ausente")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString("Código de autorização ausente")}");
             }
 
             if (string.IsNullOrEmpty(custom_state))
             {
                 _logger.LogWarning("Parâmetro custom_state ausente no callback do Google");
-                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Parâmetro custom_state ausente")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString("Parâmetro custom_state ausente")}");
             }
 
             var storedState = HttpContext.Session.GetString("oauth_state");
             if (string.IsNullOrEmpty(storedState) || storedState != custom_state)
             {
                 _logger.LogWarning("Estado OAuth inválido. Custom state recebido: {CustomState}, State armazenado: {StoredState}", custom_state, storedState);
-                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Estado OAuth inválido. Possível ataque CSRF.")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString("Estado OAuth inválido. Possível ataque CSRF.")}");
             }
 
             var codeVerifier = HttpContext.Session.GetString("code_verifier");
             if (string.IsNullOrEmpty(codeVerifier))
             {
                 _logger.LogWarning("Code verifier não encontrado na sessão");
-                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Code verifier não encontrado na sessão")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString("Code verifier não encontrado na sessão")}");
             }
 
             _logger.LogInformation("Code verifier recuperado: {CodeVerifier}", codeVerifier);
@@ -141,7 +142,7 @@ public class UsuariosController : ControllerBase
             if (sessionResponse == null || string.IsNullOrEmpty(sessionResponse.AccessToken))
             {
                 _logger.LogWarning("Falha ao trocar o código por um token de acesso usando o cliente Supabase");
-                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Falha ao trocar o código por um token de acesso")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString("Falha ao trocar o código por um token de acesso")}");
             }
 
             var accessToken = sessionResponse.AccessToken;
@@ -153,7 +154,7 @@ public class UsuariosController : ControllerBase
             if (user == null)
             {
                 _logger.LogWarning("Token inválido ou usuário não encontrado");
-                return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString("Token inválido ou usuário não encontrado")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString("Token inválido ou usuário não encontrado")}");
             }
 
             var usuarioExistente = await _supabaseClient
@@ -181,7 +182,7 @@ public class UsuariosController : ControllerBase
 
                 var token = _authService.GerarToken(novoUsuario);
                 _logger.LogInformation("Novo usuário criado: {UserId}, Email: {Email}", novoUsuario.Id, novoUsuario.Email);
-                return Redirect($"http://localhost:5173/complete-profile?status=true&message={Uri.EscapeDataString("Usuário criado. Complete seu perfil com telefone, senha e data de nascimento.")}&userId={novoUsuario.Id}&status_usuario=pendente&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email ?? "")}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/complete-profile?status=true&message={Uri.EscapeDataString("Usuário criado. Complete seu perfil com telefone, senha e data de nascimento.")}&userId={novoUsuario.Id}&status_usuario=pendente&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email ?? "")}");
             }
             else
             {
@@ -190,13 +191,13 @@ public class UsuariosController : ControllerBase
 
                 var token = _authService.GerarToken(usuarioExistente);
                 _logger.LogInformation("Login realizado com sucesso para usuário: {UserId}, Email: {Email}", usuarioExistente.Id, usuarioExistente.Email);
-                return Redirect($"http://localhost:5173/login?status=true&message={Uri.EscapeDataString("Usuário já possui conta. Faça login com email e senha.")}&email={Uri.EscapeDataString(user.Email ?? "")}&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}");
+                return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=true&message={Uri.EscapeDataString("Usuário já possui conta. Faça login com email e senha.")}&email={Uri.EscapeDataString(user.Email ?? "")}&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro no callback do Google");
-            return Redirect($"http://localhost:5173/login?status=false&message={Uri.EscapeDataString($"Erro no callback: {ex.Message}")}");
+            return Redirect($"{_configuration["FRONTEND_URL"] ?? "http://localhost:5173"}/login?status=false&message={Uri.EscapeDataString($"Erro no callback: {ex.Message}")}");
         }
     }
 
