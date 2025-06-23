@@ -220,28 +220,28 @@ public class NotificacaoService
             }
 
             long userId = validatedUserId.Value;
-            var dataAtual = DateTime.UtcNow;
-            var dataAtualIso = dataAtual.ToString("o");
-            
-            var uniqueNotificacoes = new Dictionary<long, Notificacao>();
 
-            // Busca 1: Notificações pessoais não expiradas
-            var r1 = await _supabaseService.GetClient().From<Notificacao>().Filter("usuario_id", Operator.Equals, userId).Filter("data_expiracao", Operator.GreaterThan, dataAtualIso).Get();
-            if(r1.Models != null) foreach(var m in r1.Models) uniqueNotificacoes.TryAdd(m.Id, m);
-            
-            // Busca 2: Notificações pessoais sem data de expiração
-            var r2 = await _supabaseService.GetClient().From<Notificacao>().Filter("usuario_id", Operator.Equals, userId).Filter<object>("data_expiracao", Operator.Is, null).Get();
-            if(r2.Models != null) foreach(var m in r2.Models) uniqueNotificacoes.TryAdd(m.Id, m);
+            var notificacoesGeraisComLeituras = await _supabaseService.GetClient().From<Notificacao>()
+                .Select("id, notificacoes_lidas!inner(*)")
+                .Filter<object>("usuario_id", Operator.Is, null)
+                .Get();
 
-            // Busca 3: Notificações gerais não expiradas
-            var r3 = await _supabaseService.GetClient().From<Notificacao>().Select("*,notificacoes_lidas(*)").Filter<object>("usuario_id", Operator.Is, null).Filter("data_expiracao", Operator.GreaterThan, dataAtualIso).Get();
-            if(r3.Models != null) foreach(var m in r3.Models) uniqueNotificacoes.TryAdd(m.Id, m);
+            var notificacoesGeraisLidasIds = notificacoesGeraisComLeituras.Models
+                .Where(n => n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
+                .Select(n => n.Id)
+                .ToHashSet();
 
-            // Busca 4: Notificações gerais sem data de expiração
-            var r4 = await _supabaseService.GetClient().From<Notificacao>().Select("*,notificacoes_lidas(*)").Filter<object>("usuario_id", Operator.Is, null).Filter<object>("data_expiracao", Operator.Is, null).Get();
-            if(r4.Models != null) foreach(var m in r4.Models) uniqueNotificacoes.TryAdd(m.Id, m);
+            var rpcParams = new Dictionary<string, object> { { "p_usuario_id", userId } };
+            var response = await _supabaseService.GetClient().Rpc("get_notificacoes_ativas_para_usuario", rpcParams);
+
+            if (response.ResponseMessage?.IsSuccessStatusCode != true || string.IsNullOrEmpty(response.Content))
+            {
+                _logger.LogWarning("RPC call to get_notificacoes_ativas_para_usuario failed or returned empty. Response: {Content}", response.Content);
+                return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
+            }
             
-            var todasNotificacoes = uniqueNotificacoes.Values.ToList();
+            var todasNotificacoes = JsonSerializer.Deserialize<List<Notificacao>>(response.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
+
             IEnumerable<Notificacao> notificacoesFiltradas = todasNotificacoes;
 
             if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLida))
@@ -250,20 +250,20 @@ public class NotificacaoService
                 {
                     notificacoesFiltradas = todasNotificacoes.Where(n => 
                         (n.UsuarioId.HasValue && n.Lidos > 0) || 
-                        (!n.UsuarioId.HasValue && n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
+                        (!n.UsuarioId.HasValue && notificacoesGeraisLidasIds.Contains(n.Id))
                     );
                 }
                 else
                 {
                     notificacoesFiltradas = todasNotificacoes.Where(n => 
                         (n.UsuarioId.HasValue && n.Lidos == 0) || 
-                        (!n.UsuarioId.HasValue && !n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
+                        (!n.UsuarioId.HasValue && !notificacoesGeraisLidasIds.Contains(n.Id))
                     );
                 }
             }
 
             var notificacoesOrdenadas = notificacoesFiltradas
-                .OrderByDescending(n => (n.UsuarioId.HasValue ? n.Lidos == 0 : !n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId)))
+                .OrderByDescending(n => (n.UsuarioId.HasValue ? n.Lidos == 0 : !notificacoesGeraisLidasIds.Contains(n.Id)))
                 .ThenByDescending(n => n.CreatedAt)
                 .ToList();
 
@@ -277,7 +277,7 @@ public class NotificacaoService
                 Id = n.Id,
                 Mensagem = n.Mensagem,
                 Tipo = n.Tipo,
-                Lidos = (n.UsuarioId.HasValue ? (int)n.Lidos : (n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId) ? 1 : 0)),
+                Lidos = (n.UsuarioId.HasValue ? (int)n.Lidos : (notificacoesGeraisLidasIds.Contains(n.Id) ? 1 : 0)),
                 DataExpiracao = n.DataExpiracao
             }).ToList();
 
