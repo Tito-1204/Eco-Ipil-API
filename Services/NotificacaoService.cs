@@ -222,23 +222,23 @@ public class NotificacaoService
             long userId = validatedUserId.Value;
             var dataAtual = DateTime.UtcNow;
 
-            // Passo 1: Obter a lista de IDs de notificações gerais que o usuário já leu.
-            var lidasResponse = await _supabaseService.GetClient().From<NotificacaoLida>()
-                .Filter("usuario_id", Operator.Equals, userId)
+            // Passo 1: Busca TODAS as notificações de uma vez, sem filtros.
+            var response = await _supabaseService.GetClient().From<Notificacao>()
+                .Select("*,notificacoes_lidas(*)")
                 .Get();
-            var notificacoesGeraisLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
-
-            // Passo 2: Obter TODAS as notificações relevantes (pessoais + gerais) em duas chamadas simples.
-            var todasNotificacoes = new List<Notificacao>();
             
-            var pessoaisResponse = await _supabaseService.GetClient().From<Notificacao>().Filter("usuario_id", Operator.Equals, userId).Get();
-            if (pessoaisResponse.Models != null) todasNotificacoes.AddRange(pessoaisResponse.Models);
+            if (response.Models == null)
+            {
+                _logger.LogWarning("Nenhum modelo retornado da busca de notificações.");
+                return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
+            }
 
-            var geraisResponse = await _supabaseService.GetClient().From<Notificacao>().Filter<object>("usuario_id", Operator.Is, null).Get();
-            if (geraisResponse.Models != null) todasNotificacoes.AddRange(geraisResponse.Models);
+            // Passo 2: Filtrar tudo em C#, onde temos controle total.
+            var notificacoesRelevantes = response.Models
+                .Where(n => n.UsuarioId == userId || n.UsuarioId == null)
+                .ToList();
 
-            // Passo 3: Agora, fazer toda a lógica de filtragem em C#, que é 100% seguro.
-            var notificacoesAtivas = todasNotificacoes
+            var notificacoesAtivas = notificacoesRelevantes
                 .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
                 .ToList();
             
@@ -250,20 +250,20 @@ public class NotificacaoService
                 {
                     notificacoesFiltradas = notificacoesAtivas.Where(n => 
                         (n.UsuarioId.HasValue && n.Lidos > 0) || 
-                        (!n.UsuarioId.HasValue && notificacoesGeraisLidasIds.Contains(n.Id))
+                        (!n.UsuarioId.HasValue && n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
                     );
                 }
                 else
                 {
                     notificacoesFiltradas = notificacoesAtivas.Where(n => 
                         (n.UsuarioId.HasValue && n.Lidos == 0) || 
-                        (!n.UsuarioId.HasValue && !notificacoesGeraisLidasIds.Contains(n.Id))
+                        (!n.UsuarioId.HasValue && !n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
                     );
                 }
             }
 
             var notificacoesOrdenadas = notificacoesFiltradas
-                .OrderByDescending(n => (n.UsuarioId.HasValue ? n.Lidos == 0 : !notificacoesGeraisLidasIds.Contains(n.Id)))
+                .OrderByDescending(n => n.UsuarioId.HasValue ? n.Lidos == 0 : !n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
                 .ThenByDescending(n => n.CreatedAt)
                 .ToList();
             
@@ -277,7 +277,7 @@ public class NotificacaoService
                 Id = n.Id,
                 Mensagem = n.Mensagem,
                 Tipo = n.Tipo,
-                Lidos = (n.UsuarioId.HasValue ? (int)n.Lidos : (notificacoesGeraisLidasIds.Contains(n.Id) ? 1 : 0)),
+                Lidos = n.UsuarioId.HasValue ? (int)n.Lidos : (n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId) ? 1 : 0),
                 DataExpiracao = n.DataExpiracao
             }).ToList();
 
