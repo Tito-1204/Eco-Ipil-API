@@ -220,64 +220,74 @@ public class NotificacaoService
             }
 
             long userId = validatedUserId.Value;
+            var dataAtual = DateTime.UtcNow;
+            
+            var todasNotificacoes = new List<Notificacao>();
 
-            var notificacoesGeraisComLeituras = await _supabaseService.GetClient().From<Notificacao>()
-                .Select("id, notificacoes_lidas!inner(*)")
+            // 1. Busca todas as notificações pessoais para o usuário
+            var notificacoesPessoaisResponse = await _supabaseService.GetClient().From<Notificacao>()
+                .Filter("usuario_id", Operator.Equals, userId)
+                .Get();
+            if(notificacoesPessoaisResponse.Models != null)
+            {
+                todasNotificacoes.AddRange(notificacoesPessoaisResponse.Models);
+            }
+
+            // 2. Busca todas as notificações gerais, incluindo as leituras
+            var notificacoesGeraisResponse = await _supabaseService.GetClient().From<Notificacao>()
+                .Select("*,notificacoes_lidas(*)")
                 .Filter<object>("usuario_id", Operator.Is, null)
                 .Get();
-
-            var notificacoesGeraisLidasIds = notificacoesGeraisComLeituras.Models
-                .Where(n => n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
-                .Select(n => n.Id)
-                .ToHashSet();
-
-            var rpcParams = new Dictionary<string, object> { { "p_usuario_id", userId } };
-            var response = await _supabaseService.GetClient().Rpc("get_notificacoes_ativas_para_usuario", rpcParams);
-
-            if (response.ResponseMessage?.IsSuccessStatusCode != true || string.IsNullOrEmpty(response.Content))
+            if(notificacoesGeraisResponse.Models != null)
             {
-                _logger.LogWarning("RPC call to get_notificacoes_ativas_para_usuario failed or returned empty. Response: {Content}", response.Content);
-                return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
+                todasNotificacoes.AddRange(notificacoesGeraisResponse.Models);
             }
+
+            // 3. Filtra em memória (C#) para remover as expiradas
+            var notificacoesAtivas = todasNotificacoes
+                .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
+                .ToList();
             
-            var todasNotificacoes = JsonSerializer.Deserialize<List<Notificacao>>(response.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
+            IEnumerable<Notificacao> notificacoesFiltradas = notificacoesAtivas;
 
-            IEnumerable<Notificacao> notificacoesFiltradas = todasNotificacoes;
-
+            // 4. Filtra por status "lida" se o parâmetro foi passado
             if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLida))
             {
                 if (isLida)
                 {
-                    notificacoesFiltradas = todasNotificacoes.Where(n => 
+                    notificacoesFiltradas = notificacoesAtivas.Where(n => 
                         (n.UsuarioId.HasValue && n.Lidos > 0) || 
-                        (!n.UsuarioId.HasValue && notificacoesGeraisLidasIds.Contains(n.Id))
+                        (!n.UsuarioId.HasValue && n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
                     );
                 }
                 else
                 {
-                    notificacoesFiltradas = todasNotificacoes.Where(n => 
+                    notificacoesFiltradas = notificacoesAtivas.Where(n => 
                         (n.UsuarioId.HasValue && n.Lidos == 0) || 
-                        (!n.UsuarioId.HasValue && !notificacoesGeraisLidasIds.Contains(n.Id))
+                        (!n.UsuarioId.HasValue && !n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId))
                     );
                 }
             }
 
+            // 5. Ordena o resultado final
             var notificacoesOrdenadas = notificacoesFiltradas
-                .OrderByDescending(n => (n.UsuarioId.HasValue ? n.Lidos == 0 : !notificacoesGeraisLidasIds.Contains(n.Id)))
+                .OrderByDescending(n => (n.UsuarioId.HasValue ? n.Lidos == 0 : !n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId)))
                 .ThenByDescending(n => n.CreatedAt)
                 .ToList();
-
+            
+            // 6. Aplica paginação
             if (pagina.HasValue && limite.HasValue)
             {
                 notificacoesOrdenadas = notificacoesOrdenadas.Skip((pagina.Value - 1) * limite.Value).Take(limite.Value).ToList();
             }
 
+            // 7. Mapeia para o DTO de resposta
             var notificacoesDTO = notificacoesOrdenadas.Select(n => new NotificacaoResponseDTO
             {
                 Id = n.Id,
                 Mensagem = n.Mensagem,
                 Tipo = n.Tipo,
-                Lidos = (n.UsuarioId.HasValue ? (int)n.Lidos : (notificacoesGeraisLidasIds.Contains(n.Id) ? 1 : 0)),
+                Lidos = (n.UsuarioId.HasValue ? (int)n.Lidos : (n.NotificacoesLidas.Any(nl => nl.UsuarioId == userId) ? 1 : 0)),
                 DataExpiracao = n.DataExpiracao
             }).ToList();
 
