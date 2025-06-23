@@ -134,14 +134,15 @@ builder.Services.AddCors(options =>
         });
 });
 
-// Configuração HTTPS
-builder.WebHost.UseUrls("http://0.0.0.0:3000");
+// Configuração da porta para o Railway
+var port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -151,7 +152,6 @@ if (!app.Environment.IsDevelopment())
     });
 }
 
-
 if (!app.Environment.IsDevelopment()) 
 {
     app.UseHttpsRedirection();
@@ -160,7 +160,10 @@ if (!app.Environment.IsDevelopment())
 // Adicionar o middleware de sessão antes de outros middlewares que dependem de HttpContext
 app.UseSession();
 
-app.UseCors("AllowAll");
+app.UseStaticFiles();
+app.UseRouting();
+
+app.UseCors("AllowSpecificOrigin");
 app.UseAuthentication();
 app.UseAuthorization();
 
