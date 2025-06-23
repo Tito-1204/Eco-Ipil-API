@@ -222,23 +222,24 @@ public class NotificacaoService
             long userId = validatedUserId.Value;
             var dataAtual = DateTime.UtcNow;
 
+            // Passo 1: Obter a lista de IDs de notificações gerais que o usuário já leu.
             var lidasResponse = await _supabaseService.GetClient().From<NotificacaoLida>()
                 .Where(nl => nl.UsuarioId == userId)
                 .Get();
             var notificacoesGeraisLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
 
-            var response = await _supabaseService.GetClient().From<Notificacao>().Get();
+            // Passo 2: Construir a consulta base para buscar todas as notificações relevantes (pessoais OU gerais)
+            // A biblioteca tem dificuldade com 'OR', então buscamos as duas e unimos em C#
+            var todasNotificacoes = new List<Notificacao>();
             
-            if (response.Models == null)
-            {
-                return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
-            }
-            
-            var notificacoesRelevantes = response.Models
-                .Where(n => n.UsuarioId == userId || n.UsuarioId == null)
-                .ToList();
+            var pessoaisResponse = await _supabaseService.GetClient().From<Notificacao>().Where(n => n.UsuarioId == userId).Get();
+            if (pessoaisResponse.Models != null) todasNotificacoes.AddRange(pessoaisResponse.Models);
 
-            var notificacoesAtivas = notificacoesRelevantes
+            var geraisResponse = await _supabaseService.GetClient().From<Notificacao>().Where(n => n.UsuarioId == null).Get();
+            if (geraisResponse.Models != null) todasNotificacoes.AddRange(geraisResponse.Models);
+            
+            // Passo 3: Agora, fazer toda a lógica de filtragem em C#, que é 100% seguro.
+            var notificacoesAtivas = todasNotificacoes
                 .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
                 .ToList();
             
