@@ -189,9 +189,8 @@ public class UsuariosController : ControllerBase
                 await _supabaseClient.From<Usuario>().Update(usuarioExistente);
 
                 var token = _authService.GerarToken(usuarioExistente);
-                // localStorage.setItem('authToken', token); // Removido: não é válido em C#
                 _logger.LogInformation("Login realizado com sucesso para usuário: {UserId}, Email: {Email}", usuarioExistente.Id, usuarioExistente.Email);
-                return Redirect($"http://localhost:5173/dashboard?status=true&message={Uri.EscapeDataString("Login realizado com sucesso")}&userId={usuarioExistente.Id}&status_usuario=ativo&access_token={Uri.EscapeDataString(accessToken)}&jwt_token={Uri.EscapeDataString(token)}");
+                return Redirect($"http://localhost:5173/login?status=true&message={Uri.EscapeDataString("Usuário já possui conta. Faça login com email e senha.")}&email={Uri.EscapeDataString(user.Email ?? "")}");
             }
         }
         catch (Exception ex)
