@@ -221,22 +221,26 @@ public class NotificacaoService
 
             long userId = validatedUserId.Value;
             var dataAtual = DateTime.UtcNow;
+            
+            var uniqueNotificacoes = new Dictionary<long, Notificacao>();
 
-            var todasNotificacoes = new List<Notificacao>();
+            // Busca 1: Notificações pessoais não expiradas
+            var r1 = await _supabaseService.GetClient().From<Notificacao>().Filter("usuario_id", Operator.Equals, userId).Filter("data_expiracao", Operator.GreaterThan, dataAtual).Get();
+            if(r1.Models != null) foreach(var m in r1.Models) uniqueNotificacoes.TryAdd(m.Id, m);
+            
+            // Busca 2: Notificações pessoais sem data de expiração
+            var r2 = await _supabaseService.GetClient().From<Notificacao>().Filter("usuario_id", Operator.Equals, userId).Filter<object>("data_expiracao", Operator.Is, null).Get();
+            if(r2.Models != null) foreach(var m in r2.Models) uniqueNotificacoes.TryAdd(m.Id, m);
 
-            var notificacoesPessoaisQuery = await _supabaseService.GetClient().From<Notificacao>()
-                .Where(n => n.UsuarioId == userId)
-                .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
-                .Get();
-            todasNotificacoes.AddRange(notificacoesPessoaisQuery.Models);
+            // Busca 3: Notificações gerais não expiradas
+            var r3 = await _supabaseService.GetClient().From<Notificacao>().Select("*,notificacoes_lidas(*)").Filter<object>("usuario_id", Operator.Is, null).Filter("data_expiracao", Operator.GreaterThan, dataAtual).Get();
+            if(r3.Models != null) foreach(var m in r3.Models) uniqueNotificacoes.TryAdd(m.Id, m);
 
-            var notificacoesGeraisQuery = await _supabaseService.GetClient().From<Notificacao>()
-                .Select("*,notificacoes_lidas(*)")
-                .Where(n => n.UsuarioId == null)
-                .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
-                .Get();
-            todasNotificacoes.AddRange(notificacoesGeraisQuery.Models);
-
+            // Busca 4: Notificações gerais sem data de expiração
+            var r4 = await _supabaseService.GetClient().From<Notificacao>().Select("*,notificacoes_lidas(*)").Filter<object>("usuario_id", Operator.Is, null).Filter<object>("data_expiracao", Operator.Is, null).Get();
+            if(r4.Models != null) foreach(var m in r4.Models) uniqueNotificacoes.TryAdd(m.Id, m);
+            
+            var todasNotificacoes = uniqueNotificacoes.Values.ToList();
             IEnumerable<Notificacao> notificacoesFiltradas = todasNotificacoes;
 
             if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLida))
