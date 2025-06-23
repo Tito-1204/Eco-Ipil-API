@@ -222,22 +222,18 @@ public class NotificacaoService
             long userId = validatedUserId.Value;
             var dataAtual = DateTime.UtcNow;
 
-            // Passo 1: Obter a lista de IDs de notificações gerais que o usuário já leu.
             var lidasResponse = await _supabaseService.GetClient().From<NotificacaoLida>()
                 .Where(nl => nl.UsuarioId == userId)
                 .Get();
             var notificacoesGeraisLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
 
-            // Passo 2: Obter TODAS as notificações de uma vez, sem filtros problemáticos.
             var response = await _supabaseService.GetClient().From<Notificacao>().Get();
             
             if (response.Models == null)
             {
-                _logger.LogWarning("Nenhum modelo retornado da busca de notificações.");
                 return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
             }
             
-            // Passo 3: Agora, fazer toda a lógica de filtragem em C#, que é 100% seguro.
             var notificacoesRelevantes = response.Models
                 .Where(n => n.UsuarioId == userId || n.UsuarioId == null)
                 .ToList();
