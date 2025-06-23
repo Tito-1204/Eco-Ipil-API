@@ -34,7 +34,6 @@ public class UsuariosController : ControllerBase
         _logger = logger;
     }
 
-    // Método auxiliar para calcular o code_challenge a partir do code_verifier
     private string ComputeCodeChallenge(string codeVerifier)
     {
         using var sha256 = SHA256.Create();
@@ -45,38 +44,30 @@ public class UsuariosController : ControllerBase
             .Replace('/', '_');
     }
 
-    // Endpoint para iniciar o login com Google
     [HttpGet("google-login")]
     public async Task<IActionResult> GoogleLogin()
     {
         try
         {
-            // Gerar code_verifier (string aleatória de 43 a 128 caracteres)
             var codeVerifier = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
                 .TrimEnd('=')
                 .Replace('+', '-')
                 .Replace('/', '_');
 
-            // Calcular o code_challenge a partir do code_verifier
             var codeChallenge = ComputeCodeChallenge(codeVerifier);
 
-            // Gerar um state aleatório para prevenir CSRF
             var state = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16))
                 .TrimEnd('=')
                 .Replace('+', '-')
                 .Replace('/', '_');
 
-            // Armazenar o code_verifier e o state na sessão
             HttpContext.Session.SetString("code_verifier", codeVerifier);
             HttpContext.Session.SetString("oauth_state", state);
 
-            // Configurar o redirectUri com o custom_state
             var redirectUri = $"https://eco-ipil-api-production.up.railway.app/api/v1/usuarios/google-callback?custom_state={Uri.EscapeDataString(state)}";
 
-            // Usar o cliente Supabase para iniciar o fluxo OAuth
             _logger.LogInformation("Iniciando login com Google usando o cliente Supabase, redirectUri: {RedirectUri}", redirectUri);
 
-            // Configurar as opções de login com PKCE
             var options = new Supabase.Gotrue.SignInOptions
             {
                 RedirectTo = redirectUri,
@@ -84,13 +75,11 @@ public class UsuariosController : ControllerBase
                 FlowType = Supabase.Gotrue.Constants.OAuthFlowType.PKCE
             };
 
-            // Iniciar o fluxo OAuth com o provedor Google (apenas para inicializar o estado, mas não usaremos o PKCEVerifier)
             await _supabaseClient.Auth.SignIn(
                 Supabase.Gotrue.Constants.Provider.Google,
                 options
             );
 
-            // Construir a URL de autorização manualmente usando o code_challenge calculado
             var supabaseUrl = _configuration["Supabase:Url"] ?? "https://ffzjllblyilfmrdvfege.supabase.co";
             var authUrl = $"{supabaseUrl}/auth/v1/authorize?provider=google&redirect_to={Uri.EscapeDataString(redirectUri)}&scopes={Uri.EscapeDataString("openid email profile")}&response_type=code&code_challenge={codeChallenge}&code_challenge_method=S256";
 
@@ -105,23 +94,18 @@ public class UsuariosController : ControllerBase
         }
     }
 
-    // Endpoint para processar o callback do Google
     [HttpGet("google-callback")]
     public async Task<IActionResult> GoogleCallback([FromQuery] string? code, [FromQuery] string? custom_state, [FromQuery] string? error, [FromQuery] string? error_description)
     {
         _logger.LogInformation("⚡ CALLBACK do Google acionado! code={Code}, custom_state={CustomState}, error={Error}", code, custom_state, error);
         try
         {
-            _logger.LogInformation("Callback recebido: code={Code}, custom_state={CustomState}, error={Error}, error_description={ErrorDescription}", code, custom_state, error, error_description);
-
-            // Verificar se há um erro retornado pelo Supabase
             if (!string.IsNullOrEmpty(error))
             {
                 _logger.LogError("Erro no callback do Google: {Error}, Descrição: {ErrorDescription}", error, error_description);
                 return BadRequest(new { status = false, message = "Erro no fluxo de autenticação", details = new { error, error_description } });
             }
 
-            // Validar a presença de code e custom_state
             if (string.IsNullOrEmpty(code))
             {
                 _logger.LogWarning("Código de autorização ausente no callback do Google");
@@ -134,7 +118,6 @@ public class UsuariosController : ControllerBase
                 return BadRequest(new { status = false, message = "Parâmetro custom_state ausente" });
             }
 
-            // Validar o custom_state para prevenir CSRF
             var storedState = HttpContext.Session.GetString("oauth_state");
             if (string.IsNullOrEmpty(storedState) || storedState != custom_state)
             {
@@ -142,7 +125,6 @@ public class UsuariosController : ControllerBase
                 return BadRequest(new { status = false, message = "Estado OAuth inválido. Possível ataque CSRF." });
             }
 
-            // Recuperar o code_verifier da sessão
             var codeVerifier = HttpContext.Session.GetString("code_verifier");
             if (string.IsNullOrEmpty(codeVerifier))
             {
@@ -150,10 +132,8 @@ public class UsuariosController : ControllerBase
                 return BadRequest(new { status = false, message = "Code verifier não encontrado na sessão" });
             }
 
-            // Log do code_verifier para depuração
             _logger.LogInformation("Code verifier recuperado: {CodeVerifier}", codeVerifier);
 
-            // Usar o cliente Supabase para trocar o código por um token
             _logger.LogInformation("Trocando código por access_token usando o cliente Supabase, code: {Code}", code);
             var sessionResponse = await _supabaseClient.Auth.ExchangeCodeForSession(codeVerifier, code);
 
@@ -168,7 +148,6 @@ public class UsuariosController : ControllerBase
 
             _logger.LogInformation("Access token obtido com sucesso: {AccessToken}", accessToken);
 
-            // Processar o login diretamente
             var user = await _supabaseClient.Auth.GetUser(accessToken);
             if (user == null)
             {
@@ -176,7 +155,6 @@ public class UsuariosController : ControllerBase
                 return BadRequest(new { status = false, message = "Token inválido ou usuário não encontrado" });
             }
 
-            // Verificar se o usuário já existe na tabela 'usuarios'
             var usuarioExistente = await _supabaseClient
                 .From<Usuario>()
                 .Where(u => u.UserUid == user.Id)
@@ -184,16 +162,15 @@ public class UsuariosController : ControllerBase
 
             if (usuarioExistente == null)
             {
-                // Usuário novo: criar registro em 'usuarios'
                 var novoUsuario = new Usuario
                 {
                     UserUid = user.Id ?? string.Empty,
                     Email = user.Email ?? string.Empty,
                     Nome = user.UserMetadata["full_name"]?.ToString() ?? user.Email?.Split('@')[0] ?? "Usuário",
                     Foto = user.UserMetadata["avatar_url"]?.ToString(),
-                    Telefone = "", // Campo obrigatório, será preenchido depois
-                    Senha = "", // Campo obrigatório, será preenchido depois
-                    DataNascimento = DateTime.MinValue, // Campo obrigatório, será preenchido depois
+                    Telefone = "",
+                    Senha = "",
+                    DataNascimento = DateTime.MinValue,
                     Status = "Pendente",
                     CreatedAt = DateTime.UtcNow,
                     PontosTotais = 0
@@ -201,7 +178,7 @@ public class UsuariosController : ControllerBase
 
                 await _supabaseClient.From<Usuario>().Insert(novoUsuario);
 
-                var token = _authService.GerarToken(novoUsuario); // CORREÇÃO: Passando o objeto
+                var token = _authService.GerarToken(novoUsuario);
                 _logger.LogInformation("Novo usuário criado: {UserId}, Email: {Email}", novoUsuario.Id, novoUsuario.Email);
                 return Ok(new
                 {
@@ -218,7 +195,7 @@ public class UsuariosController : ControllerBase
                 usuarioExistente.UltimoLogin = DateTime.UtcNow;
                 await _supabaseClient.From<Usuario>().Update(usuarioExistente);
 
-                var token = _authService.GerarToken(usuarioExistente); // CORREÇÃO: Passando o objeto
+                var token = _authService.GerarToken(usuarioExistente);
                 _logger.LogInformation("Login realizado com sucesso para usuário: {UserId}, Email: {Email}", usuarioExistente.Id, usuarioExistente.Email);
                 return Ok(new
                 {
@@ -238,7 +215,6 @@ public class UsuariosController : ControllerBase
         }
     }
 
-    // Os outros métodos (CompletarPerfil, ObterPerfil, etc.) permanecem inalterados
     [HttpPut("completar-perfil")]
     public async Task<IActionResult> CompletarPerfil([FromBody] CompletarPerfilRequest request)
     {
@@ -277,7 +253,7 @@ public class UsuariosController : ControllerBase
 
             await _supabaseClient.From<Usuario>().Update(usuario);
 
-            var token = _authService.GerarToken(usuario); // CORREÇÃO: Passando o objeto
+            var token = _authService.GerarToken(usuario);
             _logger.LogInformation("Perfil completado com sucesso para usuário: {UserId}", userId);
             return Ok(new
             {
@@ -372,7 +348,6 @@ public class UsuariosController : ControllerBase
         });
     }
 
-    // Endpoint para solicitar recuperação de senha
     [HttpPost("recuperar-senha")]
     public async Task<IActionResult> RecuperarSenha([FromBody] RecuperarSenhaRequestDTO request)
     {
@@ -386,7 +361,6 @@ public class UsuariosController : ControllerBase
                        : BadRequest(new { status = false, message });
     }
 
-    // Endpoint para redefinir a senha com o código
     [HttpPost("redefinir-senha")]
     public async Task<IActionResult> RedefinirSenha([FromBody] RedefinirSenhaRequestDTO request)
     {
