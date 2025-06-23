@@ -71,7 +71,7 @@ public class UsuariosController : ControllerBase
             HttpContext.Session.SetString("oauth_state", state);
 
             // Configurar o redirectUri com o custom_state
-            var redirectUri = $"https://ecoipilapi-production.up.railway.app/api/v1/usuarios/google-callback?custom_state={Uri.EscapeDataString(state)}";
+            var redirectUri = $"https://eco-ipil-api-production.up.railway.app/api/v1/usuarios/google-callback?custom_state={Uri.EscapeDataString(state)}";
 
             // Usar o cliente Supabase para iniciar o fluxo OAuth
             _logger.LogInformation("Iniciando login com Google usando o cliente Supabase, redirectUri: {RedirectUri}", redirectUri);
