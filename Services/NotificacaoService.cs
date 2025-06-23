@@ -222,26 +222,22 @@ public class NotificacaoService
             long userId = validatedUserId.Value;
             var dataAtual = DateTime.UtcNow;
             
-            var todasNotificacoes = new List<Notificacao>();
-
-            var notificacoesPessoaisResponse = await _supabaseService.GetClient().From<Notificacao>()
-                .Filter("usuario_id", Operator.Equals, userId)
-                .Get();
-            if(notificacoesPessoaisResponse.Models != null)
-            {
-                todasNotificacoes.AddRange(notificacoesPessoaisResponse.Models);
-            }
-
-            var notificacoesGeraisResponse = await _supabaseService.GetClient().From<Notificacao>()
+            var response = await _supabaseService.GetClient().From<Notificacao>()
                 .Select("*,notificacoes_lidas(*)")
-                .Filter<object>("usuario_id", Operator.Is, null)
                 .Get();
-            if(notificacoesGeraisResponse.Models != null)
+            
+            if (response.Models == null)
             {
-                todasNotificacoes.AddRange(notificacoesGeraisResponse.Models);
+                return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
             }
 
-            var notificacoesAtivas = todasNotificacoes
+            var todasNotificacoes = response.Models;
+
+            var notificacoesRelevantes = todasNotificacoes
+                .Where(n => n.UsuarioId == userId || n.UsuarioId == null)
+                .ToList();
+
+            var notificacoesAtivas = notificacoesRelevantes
                 .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
                 .ToList();
             
