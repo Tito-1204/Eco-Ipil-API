@@ -223,24 +223,22 @@ public class NotificacaoService
             var dataAtual = DateTime.UtcNow;
 
             var lidasResponse = await _supabaseService.GetClient().From<NotificacaoLida>()
-                .Match(new Dictionary<string, string> { { "usuario_id", userId.ToString() } })
+                .Where(nl => nl.UsuarioId == userId)
                 .Get();
             var notificacoesGeraisLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
 
-            var queryPessoais = _supabaseService.GetClient().From<Notificacao>()
-                .Match(new Dictionary<string, string> { { "usuario_id", userId.ToString() } });
+            var response = await _supabaseService.GetClient().From<Notificacao>().Get();
+            
+            if (response.Models == null)
+            {
+                return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
+            }
+            
+            var notificacoesRelevantes = response.Models
+                .Where(n => n.UsuarioId == userId || n.UsuarioId == null)
+                .ToList();
 
-            var queryGerais = _supabaseService.GetClient().From<Notificacao>()
-                .Where(n => n.UsuarioId == null);
-                
-            var pessoaisResponse = await queryPessoais.Get();
-            var geraisResponse = await queryGerais.Get();
-
-            var todasNotificacoes = new List<Notificacao>();
-            if (pessoaisResponse.Models != null) todasNotificacoes.AddRange(pessoaisResponse.Models);
-            if (geraisResponse.Models != null) todasNotificacoes.AddRange(geraisResponse.Models);
-
-            var notificacoesAtivas = todasNotificacoes
+            var notificacoesAtivas = notificacoesRelevantes
                 .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
                 .ToList();
             
@@ -359,4 +357,5 @@ public class NotificacaoService
             return (false, "Erro ao marcar todas as notificações como lidas");
         }
     }
+
 }
