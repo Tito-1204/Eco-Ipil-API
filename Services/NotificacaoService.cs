@@ -220,53 +220,46 @@ public class NotificacaoService
             }
             
             long userId = validatedUserId.Value;
-            var dataAtualIso = DateTime.UtcNow.ToString("o");
+            var dataAtual = DateTime.UtcNow;
             
             var lidasResponse = await _supabaseService.GetClient().From<NotificacaoLida>()
                 .Where(nl => nl.UsuarioId == userId)
                 .Get();
             var notificacoesGeraisLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
             
-            var todasNotificacoes = new List<Notificacao>();
+            var response = await _supabaseService.GetClient().From<Notificacao>().Get();
             
-            // Chamar RPC para notificações gerais
-            var responseGerais = await _supabaseService.GetClient().Rpc("get_notificacoes_gerais", new { p_data_atual = dataAtualIso });
-            if (responseGerais.ResponseMessage.IsSuccessStatusCode && !string.IsNullOrEmpty(responseGerais.Content))
+            if (response.Models == null)
             {
-                var notificacoesGerais = JsonSerializer.Deserialize<List<Notificacao>>(responseGerais.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
-                todasNotificacoes.AddRange(notificacoesGerais);
+                return (true, "Nenhuma notificação encontrada.", new List<NotificacaoResponseDTO>());
             }
             
-            // Chamar RPC para notificações pessoais
-            bool? lidaParam = string.IsNullOrEmpty(lida) ? null : bool.Parse(lida);
-            var responsePessoais = await _supabaseService.GetClient().Rpc("get_notificacoes_pessoais", new { p_usuario_id = userId, p_data_atual = dataAtualIso, p_lida = lidaParam });
-            if (responsePessoais.ResponseMessage.IsSuccessStatusCode && !string.IsNullOrEmpty(responsePessoais.Content))
-            {
-                var notificacoesPessoais = JsonSerializer.Deserialize<List<Notificacao>>(responsePessoais.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
-                todasNotificacoes.AddRange(notificacoesPessoais);
-            }
+            var notificacoesRelevantes = response.Models
+                .Where(n => n.UsuarioId == userId || n.UsuarioId == null)
+                .ToList();
 
-            // Filtrar gerais em C# se necessário
-            IEnumerable<Notificacao> notificacoesFiltradas;
+            var notificacoesAtivas = notificacoesRelevantes
+                .Where(n => n.DataExpiracao == null || n.DataExpiracao > dataAtual)
+                .ToList();
+            
+            IEnumerable<Notificacao> notificacoesFiltradas = notificacoesAtivas;
+
             if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLida))
             {
-                 notificacoesFiltradas = todasNotificacoes.Where(n => {
-                    bool isLidaNoGeral = !n.UsuarioId.HasValue && notificacoesGeraisLidasIds.Contains(n.Id);
-                    bool isPessoal = n.UsuarioId.HasValue;
-                    
-                    if(isLida) // Quer ver as lidas
-                    {
-                        return (isPessoal && n.Lidos > 0) || isLidaNoGeral;
-                    }
-                    else // Quer ver as não lidas
-                    {
-                        return (isPessoal && n.Lidos == 0) || (!n.UsuarioId.HasValue && !isLidaNoGeral);
-                    }
-                });
-            }
-            else 
-            {
-                notificacoesFiltradas = todasNotificacoes;
+                if (isLida)
+                {
+                    notificacoesFiltradas = notificacoesAtivas.Where(n => 
+                        (n.UsuarioId.HasValue && n.Lidos > 0) || 
+                        (!n.UsuarioId.HasValue && notificacoesGeraisLidasIds.Contains(n.Id))
+                    );
+                }
+                else
+                {
+                    notificacoesFiltradas = notificacoesAtivas.Where(n => 
+                        (n.UsuarioId.HasValue && n.Lidos == 0) || 
+                        (!n.UsuarioId.HasValue && !notificacoesGeraisLidasIds.Contains(n.Id))
+                    );
+                }
             }
 
             var notificacoesOrdenadas = notificacoesFiltradas
@@ -306,7 +299,11 @@ public class NotificacaoService
             
             long userId = validatedUserId.Value;
 
-            var notificacao = await _supabaseService.GetClient().From<Notificacao>().Filter("id", Operator.Equals, notificacaoId.ToString()).Single();
+            var response = await _supabaseService.GetClient().From<Notificacao>()
+                .Where(n => n.Id == notificacaoId)
+                .Get();
+
+            var notificacao = response.Models.FirstOrDefault();
             if (notificacao == null) return (false, "Notificação não encontrada");
 
             if (notificacao.UsuarioId.HasValue)
@@ -320,8 +317,11 @@ public class NotificacaoService
             }
             else
             {
-                var leituraExistente = await _supabaseService.GetClient().From<NotificacaoLida>().Filter("usuario_id", Operator.Equals, userId.ToString()).Filter("notificacao_id", Operator.Equals, notificacaoId.ToString()).Get();
-                if (!leituraExistente.Models.Any())
+                var leituraExistenteResponse = await _supabaseService.GetClient().From<NotificacaoLida>()
+                    .Where(nl => nl.UsuarioId == userId && nl.NotificacaoId == notificacaoId)
+                    .Get();
+
+                if (!leituraExistenteResponse.Models.Any())
                 {
                     var novaLeitura = new NotificacaoLida { UsuarioId = userId, NotificacaoId = notificacaoId, DataLeitura = DateTime.UtcNow };
                     await _supabaseService.GetClient().From<NotificacaoLida>().Insert(novaLeitura);
