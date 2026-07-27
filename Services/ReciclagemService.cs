@@ -80,7 +80,7 @@ public class ReciclagemService
                 return (false, "ID do material inválido no código QR", null);
             }
 
-            string qualidade = partes[3].ToLower();
+            string qualidade = partes[3].Trim().ToLower();
             if (!new[] { "ruim", "moderada", "boa", "excelente" }.Contains(qualidade))
             {
                 return (false, "Qualidade inválida ou não detectada. Deve ser 'ruim', 'moderada', 'boa' ou 'excelente'.", null);
@@ -122,14 +122,61 @@ public class ReciclagemService
                 return (false, "Erro ao verificar agente", null);
             }
 
-            var (ecopontoSuccess, ecopontoMessage, ecoponto) = await _ecopontoService.ObterEcoponto(ecopontoId);
-            if (!ecopontoSuccess || ecoponto == null)
+            Ecoponto? ecoponto = null;
+            try
             {
-                return (false, "Ecoponto não encontrado", null);
+                ecoponto = await _supabaseClient
+                    .From<Ecoponto>()
+                    .Where(x => x.Id == ecopontoId)
+                    .Single();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao consultar ecoponto no Supabase: {ex.Message}");
+
+                if (ex.Message.Contains("No rows", StringComparison.OrdinalIgnoreCase) ||
+                    ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+                    ex.Message.Contains("0 rows", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (false, $"ERRO: Ecoponto ID {ecopontoId} não existe na tabela ecopontos do banco de dados.", null);
+                }
+
+                return (false, $"Erro ao validar ecoponto no banco de dados: {ex.Message}", null);
             }
 
-            var (materialSuccess, materialMessage, material) = await _materialService.ObterMaterial(materialId);
-            if (!materialSuccess || material == null)
+            if (ecoponto == null)
+            {
+                return (false, $"ERRO: Ecoponto ID {ecopontoId} não existe na tabela ecopontos do banco de dados.", null);
+            }
+
+            if (!string.Equals(ecoponto.Status, "Ativo", StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, $"O Ecoponto {ecoponto.Nome} está com status {ecoponto.Status} e não pode receber reciclagens.", null);
+            }
+
+            Material? material = null;
+            try
+            {
+                material = await _supabaseClient
+                    .From<Material>()
+                    .Where(x => x.Id == materialId)
+                    .Single();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erro ao consultar material no Supabase: {ex.Message}");
+
+                if (ex.Message.Contains("No rows", StringComparison.OrdinalIgnoreCase) ||
+                    ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+                    ex.Message.Contains("0 rows", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (false, "Material não encontrado", null);
+                }
+
+                return (false, $"Erro ao validar material no banco de dados: {ex.Message}", null);
+            }
+
+            if (material == null)
             {
                 return (false, "Material não encontrado", null);
             }
