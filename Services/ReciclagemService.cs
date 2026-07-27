@@ -57,7 +57,9 @@ public class ReciclagemService
                 return (false, message, null);
             }
 
-            var partes = codigoQR.Split(':');
+            Console.WriteLine($"[EscanearQR] Código QR bruto recebido: {codigoQR}");
+
+            var partes = codigoQR.Split(':').Select(p => p.Trim()).ToArray();
             if (partes.Length < 4)
             {
                 return (false, "Código QR inválido ou mal formatado. Formato esperado: agente_id:ecoponto_id:material_id:qualidade[:peso]", null);
@@ -81,18 +83,23 @@ public class ReciclagemService
             string qualidade = partes[3].ToLower();
             if (!new[] { "ruim", "moderada", "boa", "excelente" }.Contains(qualidade))
             {
-                return (false, "Qualidade inválida. Deve ser 'ruim', 'moderada', 'boa' ou 'excelente'.", null);
+                return (false, "Qualidade inválida ou não detectada. Deve ser 'ruim', 'moderada', 'boa' ou 'excelente'.", null);
             }
 
             float peso = 0;
-            if (partes.Length > 4 && !float.TryParse(partes[4], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out peso))
+            if (partes.Length < 5)
             {
-                peso = 0;
+                return (false, "Peso inválido ou não detectado. É necessário informar um peso maior que zero para registrar a reciclagem.", null);
+            }
+
+            if (!float.TryParse(partes[4], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out peso))
+            {
+                return (false, "Peso inválido ou não detectado. É necessário informar um peso maior que zero para registrar a reciclagem.", null);
             }
 
             if (peso <= 0)
             {
-                return (false, "Peso inválido. É necessário informar um peso maior que zero para registrar a reciclagem.", null);
+                return (false, "Peso inválido ou não detectado. É necessário informar um peso maior que zero para registrar a reciclagem.", null);
             }
 
             string? agenteNome = null;

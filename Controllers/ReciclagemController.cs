@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using EcoIpil.API.DTOs;
 using EcoIpil.API.Services;
-using System.Text.Json;
 
 namespace EcoIpil.API.Controllers;
 
@@ -21,11 +20,27 @@ public class ReciclagemController : ControllerBase
     {
         try
         {
+            if (request == null)
+            {
+                return BadRequest(new { status = false, message = "Requisição inválida." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.CodigoQR))
+            {
+                return BadRequest(new { status = false, message = "O código QR é obrigatório." });
+            }
+
             var (success, message, data) = await _reciclagemService.EscanearQR(request.Token, request.CodigoQR);
             if (success)
             {
-                return Ok(new { status = true, message, data });
+                return Ok(new
+                {
+                    status = true,
+                    message,
+                    data = data ?? new { registroReciclagem = (object?)null, detalhes = (object?)null }
+                });
             }
+
             return BadRequest(new { status = false, message });
         }
         catch (Exception ex)
@@ -37,18 +52,27 @@ public class ReciclagemController : ControllerBase
     [HttpPost("registrar")]
     public async Task<IActionResult> RegistrarReciclagem([FromBody] ReciclagemRequestDTO request)
     {
-        var (success, message, reciclagem) = await _reciclagemService.RegistrarReciclagem(
-            request.Token,
-            request.MaterialId,
-            request.Peso,
-            request.EcopontoId,
-            request.Qualidade ?? string.Empty,
-            request.AgenteId);
+        try
+        {
+            var (success, message, reciclagem) = await _reciclagemService.RegistrarReciclagem(
+                request.Token,
+                request.MaterialId,
+                request.Peso,
+                request.EcopontoId,
+                request.Qualidade ?? string.Empty,
+                request.AgenteId);
 
-        if (!success)
-            return BadRequest(new { status = false, message });
+            if (!success)
+            {
+                return BadRequest(new { status = false, message });
+            }
 
-        return Ok(new { status = true, message, data = reciclagem });
+            return Ok(new { status = true, message, data = reciclagem });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { status = false, message = $"Erro ao registrar reciclagem: {ex.Message}" });
+        }
     }
 
     [HttpPost("avaliar")]
@@ -63,13 +87,9 @@ public class ReciclagemController : ControllerBase
 
             if (success)
             {
-                var options = new JsonSerializerOptions
-                {
-                    IgnoreReadOnlyProperties = true,
-                    PropertyNameCaseInsensitive = true
-                };
-                return Ok(JsonSerializer.Serialize(new { status = true, message, data }, options));
+                return Ok(new { status = true, message, data });
             }
+
             return BadRequest(new { status = false, message });
         }
         catch (Exception ex)
