@@ -64,20 +64,20 @@ public class InvestirController : ControllerBase
     }
 
     [HttpPost("apply-returns")]
-    public async Task<IActionResult> ApplyReturns([FromQuery] string token)
+    public async Task<IActionResult> ApplyReturns([FromBody] BaseRequestDTO request)
     {
         try
         {
             // Validar o token
-            if (string.IsNullOrEmpty(token))
+            if (string.IsNullOrEmpty(request.Token))
             {
                 return Unauthorized(new { status = false, message = "Token de autenticação não fornecido" });
             }
 
-            var (success, message) = await _investirService.ApplyReturns(token); // Passa o token para o serviço
+            var (success, message) = await _investirService.ApplyReturns(request.Token); // Passa o token para o serviço
             if (success)
             {
-                return Ok(new { status = true, message });
+                return Ok(new { status = true, message = message });
             }
             else
             {

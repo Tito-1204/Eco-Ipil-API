@@ -198,18 +198,22 @@ public class InvestirService
                 .Filter("data_retorno", Operator.LessThanOrEqual, DateTime.UtcNow.ToString("o")) // Data de retorno <= data atual
                 .Get();
 
-            if (!dueInvestments.Models.Any())
+            var investments = dueInvestments?.Models?.ToList() ?? Enumerable.Empty<Investir>().ToList();
+
+            if (!investments.Any())
             {
                 _logger.LogInformation("Nenhum investimento com retorno devido encontrado para o usuário {UserId}", loggedUserId);
-                return (true, "Nenhum retorno a ser aplicado no momento");
+                return (true, "Você não possui retornos de investimento para coletar no momento");
             }
 
-            foreach (var investment in dueInvestments.Models)
+            var processedCount = 0;
+
+            foreach (var investment in investments)
             {
                 // Verificar se o valor_retorno é maior que zero
                 if (investment.ValorRetorno <= 0)
                 {
-                    _logger.LogInformation("Investimento {InvestimentoId} do usuário {UserId} tem valor_retorno zero ou negativo, pulando aplicação", 
+                    _logger.LogInformation("Investimento {InvestimentoId} do usuário {UserId} tem valor_retorno zero ou negativo, pulando aplicação",
                         investment.InvestimentoId, loggedUserId);
                     continue; // Pula para o próximo registro
                 }
@@ -228,11 +232,15 @@ public class InvestirService
                     .Set(i => i.ValorRetorno, 0.0)
                     .Update();
 
+                processedCount++;
+
                 _logger.LogInformation("Retorno de {ValorRetorno} pontos aplicado com sucesso para o usuário {UserId} no investimento {InvestimentoId}",
                     investment.ValorRetorno, investment.UsuarioId, investment.InvestimentoId);
             }
 
-            return (true, "Retornos aplicados com sucesso para os investimentos elegíveis");
+            return (true, processedCount > 0
+                ? $"Retornos aplicados com sucesso para {processedCount} investimento(s) elegível(is)"
+                : "Nenhum investimento foi processado no momento");
         }
         catch (Exception ex)
         {
