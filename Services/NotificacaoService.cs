@@ -222,14 +222,15 @@ public class NotificacaoService
             long userId = validatedUserId.Value;
             var dataAtualIso = DateTime.UtcNow.ToString("o");
             
+            // Buscar todas as marcações de leitura efetuadas pelo usuário na tabela notificacoes_lidas
             var lidasResponse = await _supabaseService.GetClient().From<NotificacaoLida>()
                 .Where(nl => nl.UsuarioId == userId)
                 .Get();
-            var notificacoesGeraisLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
+            var notificacoesLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
             
             var todasNotificacoes = new List<Notificacao>();
             
-            // Chamar RPC para notificações gerais
+            // Chamar RPC para notificações gerais (agentes/geral)
             var responseGerais = await _supabaseService.GetClient().Rpc("get_notificacoes_gerais", new { p_data_atual = dataAtualIso });
             if (responseGerais.ResponseMessage.IsSuccessStatusCode && !string.IsNullOrEmpty(responseGerais.Content))
             {
@@ -246,31 +247,25 @@ public class NotificacaoService
                 todasNotificacoes.AddRange(notificacoesPessoais);
             }
 
-            // Filtrar gerais em C# se necessário
+            // Remover duplicados se houver
+            var notificacoesUnicas = todasNotificacoes.GroupBy(n => n.Id).Select(g => g.First()).ToList();
+
+            // Filtrar status de leitura de forma unificada
             IEnumerable<Notificacao> notificacoesFiltradas;
-            if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLida))
+            if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLidaReq))
             {
-                 notificacoesFiltradas = todasNotificacoes.Where(n => {
-                    bool isLidaNoGeral = !n.UsuarioId.HasValue && notificacoesGeraisLidasIds.Contains(n.Id);
-                    bool isPessoal = n.UsuarioId.HasValue;
-                    
-                    if(isLida) // Quer ver as lidas
-                    {
-                        return (isPessoal && n.Lidos > 0) || isLidaNoGeral;
-                    }
-                    else // Quer ver as não lidas
-                    {
-                        return (isPessoal && n.Lidos == 0) || (!n.UsuarioId.HasValue && !isLidaNoGeral);
-                    }
+                notificacoesFiltradas = notificacoesUnicas.Where(n => {
+                    bool isLida = n.Lidos > 0 || notificacoesLidasIds.Contains(n.Id);
+                    return isLidaReq ? isLida : !isLida;
                 });
             }
             else 
             {
-                notificacoesFiltradas = todasNotificacoes;
+                notificacoesFiltradas = notificacoesUnicas;
             }
 
             var notificacoesOrdenadas = notificacoesFiltradas
-                .OrderByDescending(n => (n.UsuarioId.HasValue ? n.Lidos == 0 : !notificacoesGeraisLidasIds.Contains(n.Id)))
+                .OrderByDescending(n => (n.Lidos == 0 && !notificacoesLidasIds.Contains(n.Id)))
                 .ThenByDescending(n => n.CreatedAt)
                 .ToList();
             
@@ -284,7 +279,7 @@ public class NotificacaoService
                 Id = n.Id,
                 Mensagem = n.Mensagem,
                 Tipo = n.Tipo,
-                Lidos = (n.UsuarioId.HasValue ? (int)n.Lidos : (notificacoesGeraisLidasIds.Contains(n.Id) ? 1 : 0)),
+                Lidos = (n.Lidos > 0 || notificacoesLidasIds.Contains(n.Id)) ? 1 : 0,
                 DataExpiracao = n.DataExpiracao
             }).ToList();
 
@@ -313,9 +308,26 @@ public class NotificacaoService
             var notificacao = response.Models?.FirstOrDefault();
             if (notificacao == null)
             {
-                return (true, "Notificação não encontrada ou já processada");
+                return (false, "Notificação não encontrada");
             }
 
+            // 1. Gravar registro permanente na tabela notificacoes_lidas para este usuário
+            var leituraExistente = await _supabaseService.GetClient().From<NotificacaoLida>()
+                .Where(nl => nl.UsuarioId == userId && nl.NotificacaoId == notificacaoId)
+                .Get();
+
+            if (leituraExistente.Models == null || !leituraExistente.Models.Any())
+            {
+                var novaLeitura = new NotificacaoLida
+                {
+                    UsuarioId = userId,
+                    NotificacaoId = notificacaoId,
+                    DataLeitura = DateTime.UtcNow
+                };
+                await _supabaseService.GetClient().From<NotificacaoLida>().Insert(novaLeitura);
+            }
+
+            // 2. Se for notificação pessoal do usuário, atualizar também a coluna lidos na tabela notificacoes
             if (notificacao.UsuarioId.HasValue && notificacao.UsuarioId.Value == userId)
             {
                 if (notificacao.Lidos == 0)
@@ -326,24 +338,13 @@ public class NotificacaoService
                         .Update(notificacao);
                 }
             }
-            else
-            {
-                var leituraExistente = await _supabaseService.GetClient().From<NotificacaoLida>()
-                    .Where(nl => nl.UsuarioId == userId && nl.NotificacaoId == notificacaoId)
-                    .Get();
 
-                if (leituraExistente.Models == null || !leituraExistente.Models.Any())
-                {
-                    var novaLeitura = new NotificacaoLida { UsuarioId = userId, NotificacaoId = notificacaoId, DataLeitura = DateTime.UtcNow };
-                    await _supabaseService.GetClient().From<NotificacaoLida>().Insert(novaLeitura);
-                }
-            }
             return (true, "Notificação marcada como lida com sucesso");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao marcar notificação {NotificacaoId} como lida", notificacaoId);
-            return (true, "Notificação marcada como lida com sucesso");
+            return (false, $"Erro ao marcar notificação como lida: {ex.Message}");
         }
     }
 
@@ -357,7 +358,7 @@ public class NotificacaoService
             long userId = validatedUserId.Value;
 
             var response = await ListarNotificacoes(token, "false", 1, 1000);
-            if (!response.success)
+            if (!response.success || response.notificacoes == null)
             {
                  return (false, "Erro ao buscar notificações para marcar como lidas.");
             }
@@ -372,7 +373,7 @@ public class NotificacaoService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao marcar todas as notificações como lidas");
-            return (true, "Todas as notificações marcadas como lidas com sucesso");
+            return (false, $"Erro ao marcar todas como lidas: {ex.Message}");
         }
     }
 }
