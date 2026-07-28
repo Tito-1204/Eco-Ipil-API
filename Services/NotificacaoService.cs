@@ -230,12 +230,17 @@ public class NotificacaoService
 
             // 2. Buscar notificações diretamente da tabela notificacoes
             var responseNotificacoes = await _supabaseService.GetAdminClient().From<Notificacao>()
+                .Select("*")
                 .Get();
 
-            var agora = DateTime.UtcNow;
-            var todasNotificacoes = responseNotificacoes.Models?
-                .Where(n => (n.UsuarioId == userId || !n.UsuarioId.HasValue) && (n.DataExpiracao == null || n.DataExpiracao > agora))
-                .ToList() ?? new List<Notificacao>();
+            var listaBruta = responseNotificacoes.Models ?? new List<Notificacao>();
+            _logger.LogInformation("Total de notificações brutas no banco: {Count}", listaBruta.Count);
+
+            var todasNotificacoes = listaBruta
+                .Where(n => n.UsuarioId == userId || !n.UsuarioId.HasValue || n.UsuarioId == 0)
+                .ToList();
+
+            _logger.LogInformation("Notificações filtradas para o utilizador {UserId}: {Count}", userId, todasNotificacoes.Count);
 
             // 3. Filtrar status de leitura de forma unificada
             IEnumerable<Notificacao> notificacoesFiltradas;
