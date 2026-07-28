@@ -1,7 +1,6 @@
 using Supabase.Postgrest.Attributes;
 using Supabase.Postgrest.Models;
 using System;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace EcoIpil.API.Models
@@ -9,7 +8,7 @@ namespace EcoIpil.API.Models
     [Table("notificacoes")]
     public class Notificacao : BaseModel
     {
-        [PrimaryKey("id")]
+        [PrimaryKey("id", shouldInsert: false)]
         [JsonPropertyName("id")]
         public long Id { get; set; }
 
@@ -36,9 +35,5 @@ namespace EcoIpil.API.Models
         [Column("usuario_id")]
         [JsonPropertyName("usuario_id")]
         public long? UsuarioId { get; set; }
-
-        [Reference(typeof(NotificacaoLida))]
-        [JsonPropertyName("notificacoes_lidas")]
-        public List<NotificacaoLida> NotificacoesLidas { get; set; } = new List<NotificacaoLida>();
     }
 }
