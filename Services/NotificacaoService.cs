@@ -220,50 +220,35 @@ public class NotificacaoService
             }
             
             long userId = validatedUserId.Value;
-            var dataAtualIso = DateTime.UtcNow.ToString("o");
-            
-            // Buscar todas as marcações de leitura efetuadas pelo usuário na tabela notificacoes_lidas
-            // Usar cliente admin para garantir que não é bloqueado por RLS
+
+            // 1. Buscar todas as marcações de leitura efetuadas pelo usuário na tabela notificacoes_lidas
             var lidasResponse = await _supabaseService.GetAdminClient().From<NotificacaoLida>()
                 .Where(nl => nl.UsuarioId == userId)
                 .Get();
             var notificacoesLidasIds = lidasResponse.Models?.Select(nl => nl.NotificacaoId).ToHashSet() ?? new HashSet<long>();
             _logger.LogInformation("Utilizador {UserId} tem {Count} notificações lidas registadas", userId, notificacoesLidasIds.Count);
-            
-            var todasNotificacoes = new List<Notificacao>();
-            
-            // Chamar RPC para notificações gerais (agentes/geral)
-            var responseGerais = await _supabaseService.GetClient().Rpc("get_notificacoes_gerais", new { p_data_atual = dataAtualIso });
-            if (responseGerais.ResponseMessage.IsSuccessStatusCode && !string.IsNullOrEmpty(responseGerais.Content))
-            {
-                var notificacoesGerais = JsonSerializer.Deserialize<List<Notificacao>>(responseGerais.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
-                todasNotificacoes.AddRange(notificacoesGerais);
-            }
-            
-            // Chamar RPC para notificações pessoais
-            bool? lidaParam = string.IsNullOrEmpty(lida) ? null : bool.Parse(lida);
-            var responsePessoais = await _supabaseService.GetClient().Rpc("get_notificacoes_pessoais", new { p_usuario_id = userId, p_data_atual = dataAtualIso, p_lida = lidaParam });
-            if (responsePessoais.ResponseMessage.IsSuccessStatusCode && !string.IsNullOrEmpty(responsePessoais.Content))
-            {
-                var notificacoesPessoais = JsonSerializer.Deserialize<List<Notificacao>>(responsePessoais.Content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<Notificacao>();
-                todasNotificacoes.AddRange(notificacoesPessoais);
-            }
 
-            // Remover duplicados se houver
-            var notificacoesUnicas = todasNotificacoes.GroupBy(n => n.Id).Select(g => g.First()).ToList();
+            // 2. Buscar notificações diretamente da tabela notificacoes
+            var responseNotificacoes = await _supabaseService.GetAdminClient().From<Notificacao>()
+                .Get();
 
-            // Filtrar status de leitura de forma unificada
+            var agora = DateTime.UtcNow;
+            var todasNotificacoes = responseNotificacoes.Models?
+                .Where(n => (n.UsuarioId == userId || !n.UsuarioId.HasValue) && (n.DataExpiracao == null || n.DataExpiracao > agora))
+                .ToList() ?? new List<Notificacao>();
+
+            // 3. Filtrar status de leitura de forma unificada
             IEnumerable<Notificacao> notificacoesFiltradas;
             if (!string.IsNullOrEmpty(lida) && bool.TryParse(lida, out bool isLidaReq))
             {
-                notificacoesFiltradas = notificacoesUnicas.Where(n => {
-                    bool isLida = n.Lidos > 0 || notificacoesLidasIds.Contains(n.Id);
+                notificacoesFiltradas = todasNotificacoes.Where(n => {
+                    bool isLida = (n.Lidos > 0) || notificacoesLidasIds.Contains(n.Id);
                     return isLidaReq ? isLida : !isLida;
                 });
             }
             else 
             {
-                notificacoesFiltradas = notificacoesUnicas;
+                notificacoesFiltradas = todasNotificacoes;
             }
 
             var notificacoesOrdenadas = notificacoesFiltradas
@@ -303,7 +288,6 @@ public class NotificacaoService
             
             long userId = validatedUserId.Value;
 
-            // Usar cliente admin para leituras também (mais confiável)
             var response = await _supabaseService.GetAdminClient().From<Notificacao>()
                 .Where(x => x.Id == notificacaoId)
                 .Get();
@@ -315,7 +299,6 @@ public class NotificacaoService
             }
 
             // 1. Gravar registro permanente na tabela notificacoes_lidas
-            //    Usar GetAdminClient() para contornar RLS do Supabase
             var leituraExistente = await _supabaseService.GetAdminClient().From<NotificacaoLida>()
                 .Where(nl => nl.UsuarioId == userId && nl.NotificacaoId == notificacaoId)
                 .Get();
@@ -329,24 +312,17 @@ public class NotificacaoService
                     DataLeitura = DateTime.UtcNow
                 };
                 await _supabaseService.GetAdminClient().From<NotificacaoLida>().Insert(novaLeitura);
-                _logger.LogInformation("Leitura registrada: usuário {UserId}, notificação {NotificacaoId}", userId, notificacaoId);
-            }
-            else
-            {
-                _logger.LogInformation("Leitura já existente: usuário {UserId}, notificação {NotificacaoId}", userId, notificacaoId);
+                _logger.LogInformation("Leitura registrada na tabela notificacoes_lidas: usuário {UserId}, notificação {NotificacaoId}", userId, notificacaoId);
             }
 
-            // 2. Se for notificação pessoal do usuário, atualizar também lidos na tabela notificacoes
-            if (notificacao.UsuarioId.HasValue && notificacao.UsuarioId.Value == userId)
+            // 2. Atualizar também a coluna lidos na tabela notificacoes
+            if (notificacao.Lidos == 0)
             {
-                if (notificacao.Lidos == 0)
-                {
-                    notificacao.Lidos = 1;
-                    await _supabaseService.GetAdminClient().From<Notificacao>()
-                        .Where(x => x.Id == notificacaoId)
-                        .Update(notificacao);
-                    _logger.LogInformation("Campo lidos atualizado na tabela notificacoes: {NotificacaoId}", notificacaoId);
-                }
+                notificacao.Lidos = 1;
+                await _supabaseService.GetAdminClient().From<Notificacao>()
+                    .Where(x => x.Id == notificacaoId)
+                    .Update(notificacao);
+                _logger.LogInformation("Coluna lidos atualizada para 1 na tabela notificacoes para a notificação {NotificacaoId}", notificacaoId);
             }
 
             return (true, "Notificação marcada como lida com sucesso");
