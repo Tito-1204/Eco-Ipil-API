@@ -124,14 +124,13 @@ builder.Services.AddSession(options =>
 // CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowSpecificOrigin",
-        builder =>
+    options.AddPolicy("AllowLocalhost",
+        policy =>
         {
-            builder
+            policy
                 .WithOrigins("http://localhost:5173")
-                .AllowAnyMethod()
                 .AllowAnyHeader()
-                .AllowCredentials();
+                .AllowAnyMethod();
         });
 });
 
@@ -163,7 +162,7 @@ app.UseSession();
 app.UseStaticFiles();
 app.UseRouting();
 
-app.UseCors("AllowSpecificOrigin");
+app.UseCors("AllowLocalhost");
 app.UseAuthentication();
 app.UseAuthorization();
 

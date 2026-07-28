@@ -478,9 +478,10 @@ public class ReciclagemService
                 .Where(a => a.ReciclagemId == reciclagem.Id)
                 .Get();
 
-            if (existingEvaluationResponse?.Models?.Any() == true)
+            var existingEvaluation = existingEvaluationResponse?.Models?.FirstOrDefault();
+            if (existingEvaluation != null)
             {
-                return (false, "Esta reciclagem já foi avaliada.", null);
+                return (true, "Esta reciclagem já foi avaliada anteriormente.", existingEvaluation);
             }
 
             // Obter o agente_id do registro de reciclagem
