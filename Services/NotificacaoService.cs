@@ -306,22 +306,32 @@ public class NotificacaoService
             
             long userId = validatedUserId.Value;
 
-            var notificacao = await _supabaseService.GetClient().From<Notificacao>().Filter("id", Operator.Equals, notificacaoId.ToString()).Single();
+            var response = await _supabaseService.GetClient().From<Notificacao>()
+                .Where(x => x.Id == notificacaoId)
+                .Get();
+
+            var notificacao = response.Models?.FirstOrDefault();
             if (notificacao == null) return (false, "Notificação não encontrada");
 
             if (notificacao.UsuarioId.HasValue)
             {
-                if (notificacao.UsuarioId != userId) return (false, "Notificação não pertence ao usuário");
+                if (notificacao.UsuarioId.Value != userId) return (false, "Notificação não pertence ao usuário");
 
                 if (notificacao.Lidos == 0)
                 {
-                    await _supabaseService.GetClient().From<Notificacao>().Where(x => x.Id == notificacaoId).Set(x => x.Lidos, 1).Update();
+                    notificacao.Lidos = 1;
+                    await _supabaseService.GetClient().From<Notificacao>()
+                        .Where(x => x.Id == notificacaoId)
+                        .Update(notificacao);
                 }
             }
             else
             {
-                var leituraExistente = await _supabaseService.GetClient().From<NotificacaoLida>().Filter("usuario_id", Operator.Equals, userId.ToString()).Filter("notificacao_id", Operator.Equals, notificacaoId.ToString()).Get();
-                if (!leituraExistente.Models.Any())
+                var leituraExistente = await _supabaseService.GetClient().From<NotificacaoLida>()
+                    .Where(nl => nl.UsuarioId == userId && nl.NotificacaoId == notificacaoId)
+                    .Get();
+
+                if (leituraExistente.Models == null || !leituraExistente.Models.Any())
                 {
                     var novaLeitura = new NotificacaoLida { UsuarioId = userId, NotificacaoId = notificacaoId, DataLeitura = DateTime.UtcNow };
                     await _supabaseService.GetClient().From<NotificacaoLida>().Insert(novaLeitura);
@@ -331,8 +341,8 @@ public class NotificacaoService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao marcar notificação como lida");
-            return (false, "Erro ao marcar notificação como lida");
+            _logger.LogError(ex, "Erro ao marcar notificação {NotificacaoId} como lida", notificacaoId);
+            return (false, $"Erro ao marcar notificação como lida: {ex.Message}");
         }
     }
 
