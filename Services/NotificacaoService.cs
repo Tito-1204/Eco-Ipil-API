@@ -236,11 +236,12 @@ public class NotificacaoService
             var listaBruta = responseNotificacoes.Models ?? new List<Notificacao>();
             _logger.LogInformation("Total de notificações brutas no banco: {Count}", listaBruta.Count);
 
+            var agora = DateTime.UtcNow;
             var todasNotificacoes = listaBruta
-                .Where(n => n.UsuarioId == userId || !n.UsuarioId.HasValue || n.UsuarioId == 0)
+                .Where(n => (n.UsuarioId == userId || !n.UsuarioId.HasValue || n.UsuarioId == 0) && (n.DataExpiracao == null || n.DataExpiracao >= agora.Date))
                 .ToList();
 
-            _logger.LogInformation("Notificações filtradas para o utilizador {UserId}: {Count}", userId, todasNotificacoes.Count);
+            _logger.LogInformation("Notificações válidas para o utilizador {UserId}: {Count}", userId, todasNotificacoes.Count);
 
             // 3. Filtrar status de leitura de forma unificada
             IEnumerable<Notificacao> notificacoesFiltradas;
