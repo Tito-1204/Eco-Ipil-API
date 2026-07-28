@@ -67,7 +67,24 @@ public class ReciclagemController : ControllerBase
                 return BadRequest(new { status = false, message });
             }
 
-            return Ok(new { status = true, message, data = reciclagem });
+            var safeReciclagem = reciclagem == null ? null : new
+            {
+                id = reciclagem.Id,
+                createdAt = reciclagem.CreatedAt,
+                peso = reciclagem.Peso,
+                usuarioId = reciclagem.UsuarioId,
+                materialId = reciclagem.MaterialId,
+                ecopontoId = reciclagem.EcopontoId,
+                agenteId = reciclagem.AgenteId,
+                materialNome = reciclagem.MaterialNome,
+                materialClasse = reciclagem.MaterialClasse,
+                pontosGanhos = reciclagem.PontosGanhos,
+                ecopontoNome = reciclagem.EcopontoNome,
+                ecopontoLocalizacao = reciclagem.EcopontoLocalizacao,
+                agenteNome = reciclagem.AgenteNome
+            };
+
+            return Ok(new { status = true, message, data = safeReciclagem });
         }
         catch (Exception ex)
         {
@@ -87,7 +104,8 @@ public class ReciclagemController : ControllerBase
 
             if (success)
             {
-                return Ok(new { status = true, message, data });
+                var safeData = data == null ? new { id = (long?)null, status = (string?)null } : data;
+                return Ok(new { status = true, message, data = safeData });
             }
 
             return BadRequest(new { status = false, message });

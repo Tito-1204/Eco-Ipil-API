@@ -437,7 +437,7 @@ public class ReciclagemService
         }
     }
 
-    public async Task<(bool success, string message, AvaliacoesReciclagem? data)> AvaliarReciclagem(string token, int rating, string? comentario)
+    public async Task<(bool success, string message, object? data)> AvaliarReciclagem(string token, int rating, string? comentario)
     {
         try
         {
@@ -455,21 +455,21 @@ public class ReciclagemService
                 return (false, "A nota deve estar entre 1 e 5.", null);
             }
 
-            // Buscar a reciclagem mais recente do usuário logado
-            var limiteData = DateTime.UtcNow.AddDays(-1); // Limite de 1 dia atrás
-            var reciclagem = await _supabaseClient
+            // Buscar a reciclagem mais recente do usuário logado sem filtro de 24 horas
+            var reciclagemResponse = await _supabaseClient
                 .From<Reciclagem>()
                 .Select("*")
                 .Where(r => r.UsuarioId == userId)
-                .Where(r => r.ColetaId == null) // Não deve estar ligada a uma coleta
-                .Where(r => r.CreatedAt >= limiteData) // Criada nas últimas 24 horas
-                .Order("created_at", Ordering.Descending) // Mais recente primeiro
+                .Where(r => r.ColetaId == null)
+                .Order("created_at", Ordering.Descending)
                 .Limit(1)
-                .Single();
+                .Get();
+
+            var reciclagem = reciclagemResponse?.Models?.FirstOrDefault();
 
             if (reciclagem == null)
             {
-                return (false, "Nenhuma reciclagem recente encontrada para avaliação. Certifique-se de ter uma reciclagem nas últimas 24 horas que não esteja ligada a uma coleta.", null);
+                return (false, "Nenhuma reciclagem encontrada para avaliação. Certifique-se de ter uma reciclagem válida que não esteja ligada a uma coleta.", null);
             }
 
             // Verificar se já existe uma avaliação para essa reciclagem
@@ -481,7 +481,7 @@ public class ReciclagemService
             var existingEvaluation = existingEvaluationResponse?.Models?.FirstOrDefault();
             if (existingEvaluation != null)
             {
-                return (true, "Esta reciclagem já foi avaliada anteriormente.", existingEvaluation);
+                return (true, "Esta reciclagem já foi avaliada anteriormente.", new { id = existingEvaluation.Id, status = "JaAvaliado" });
             }
 
             // Obter o agente_id do registro de reciclagem
@@ -498,7 +498,7 @@ public class ReciclagemService
                 UsuarioId = userId,
                 AgenteId = agenteId,
                 Rating = rating,
-                Comentario = comentario?.Trim(), // Sanitizar comentário, se presente
+                Comentario = comentario?.Trim(),
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -513,8 +513,8 @@ public class ReciclagemService
                 return (false, "Erro ao inserir avaliação: não foi possível recuperar o registro inserido.", null);
             }
 
-            // Retornar sucesso
-            return (true, "Avaliação enviada com sucesso.", avaliacaoInserida);
+            // Retornar sucesso com um objeto seguro
+            return (true, "Avaliação enviada com sucesso.", new { id = avaliacaoInserida.Id, status = "Sucesso" });
         }
         catch (Exception ex)
         {

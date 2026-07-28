@@ -122,17 +122,7 @@ builder.Services.AddSession(options =>
 });
 
 // CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowLocalhost",
-        policy =>
-        {
-            policy
-                .WithOrigins("http://localhost:5173")
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        });
-});
+builder.Services.AddCors(options => options.AddPolicy("AllowReact", policy => policy.WithOrigins("http://localhost:5173").AllowAnyMethod().AllowAnyHeader()));
 
 // Configuração da porta para o Railway
 builder.WebHost.UseUrls($"http://0.0.0.0:3000");
@@ -162,7 +152,7 @@ app.UseSession();
 app.UseStaticFiles();
 app.UseRouting();
 
-app.UseCors("AllowLocalhost");
+app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
 
