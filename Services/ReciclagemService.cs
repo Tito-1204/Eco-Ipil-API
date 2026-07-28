@@ -473,12 +473,12 @@ public class ReciclagemService
             }
 
             // Verificar se já existe uma avaliação para essa reciclagem
-            var existingEvaluation = await _supabaseClient
+            var existingEvaluationResponse = await _supabaseClient
                 .From<AvaliacoesReciclagem>()
                 .Where(a => a.ReciclagemId == reciclagem.Id)
-                .Single();
+                .Get();
 
-            if (existingEvaluation != null)
+            if (existingEvaluationResponse?.Models?.Any() == true)
             {
                 return (false, "Esta reciclagem já foi avaliada.", null);
             }
