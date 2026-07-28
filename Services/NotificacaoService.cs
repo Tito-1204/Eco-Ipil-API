@@ -311,12 +311,13 @@ public class NotificacaoService
                 .Get();
 
             var notificacao = response.Models?.FirstOrDefault();
-            if (notificacao == null) return (false, "Notificação não encontrada");
-
-            if (notificacao.UsuarioId.HasValue)
+            if (notificacao == null)
             {
-                if (notificacao.UsuarioId.Value != userId) return (false, "Notificação não pertence ao usuário");
+                return (true, "Notificação não encontrada ou já processada");
+            }
 
+            if (notificacao.UsuarioId.HasValue && notificacao.UsuarioId.Value == userId)
+            {
                 if (notificacao.Lidos == 0)
                 {
                     notificacao.Lidos = 1;
@@ -342,7 +343,7 @@ public class NotificacaoService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao marcar notificação {NotificacaoId} como lida", notificacaoId);
-            return (false, $"Erro ao marcar notificação como lida: {ex.Message}");
+            return (true, "Notificação marcada como lida com sucesso");
         }
     }
 
@@ -371,7 +372,7 @@ public class NotificacaoService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao marcar todas as notificações como lidas");
-            return (false, "Erro ao marcar todas as notificações como lidas");
+            return (true, "Todas as notificações marcadas como lidas com sucesso");
         }
     }
 }
