@@ -638,11 +638,12 @@ public class UsuarioService
             var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
             var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
             var senderEmail = _configuration["EmailSettings:SenderEmail"];
-            var senderPassword = _configuration["EmailSettings:SenderPassword"];
+            var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
 
             await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
             await client.AuthenticateAsync(senderEmail, senderPassword);
             await client.SendAsync(message);
+            await client.DisconnectAsync(true);
             Console.WriteLine($"Email de recuperação enviado para {email} com código {codigo}");
             }
         }

@@ -15,11 +15,11 @@ namespace EcoIpil.API.Services
 
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            var smtpHost = _configuration["Smtp:Host"];
-            var smtpPort = int.Parse(_configuration["Smtp:Port"] ?? "587");
-            var smtpUsername = _configuration["Smtp:Username"];
-            var smtpPassword = _configuration["Smtp:Password"];
-            var fromEmail = _configuration["Smtp:FromEmail"];
+            var smtpHost = _configuration["EmailSettings:SmtpServer"];
+            var smtpPort = int.Parse(_configuration["EmailSettings:SmtpPort"] ?? "587");
+            var smtpUsername = _configuration["EmailSettings:SenderEmail"];
+            var smtpPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
+            var fromEmail = _configuration["EmailSettings:SenderEmail"];
 
             using var client = new SmtpClient(smtpHost, smtpPort)
             {

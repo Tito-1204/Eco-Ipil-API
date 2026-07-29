@@ -10,8 +10,10 @@ using System.Linq;
 using Supabase.Postgrest.Models;
 using Supabase;
 using Supabase.Gotrue;
-using System.Net.Mail;
-using System.Net;
+using Supabase.Gotrue;
+using MailKit.Net.Smtp;
+using MimeKit;
+using MailKit.Security;
 
 namespace EcoIpil.API.Services
 {
@@ -318,21 +320,18 @@ namespace EcoIpil.API.Services
 
                 await client.From<CodigoVerificacao>().Insert(codigoVerificacao);
 
-                var smtpClient = new SmtpClient(_configuration["EmailSettings:SmtpServer"])
-                {
-                    Port = int.Parse(_configuration["EmailSettings:SmtpPort"]),
-                    Credentials = new NetworkCredential(
-                        _configuration["EmailSettings:SenderEmail"],
-                        _configuration["EmailSettings:SenderPassword"]),
-                    EnableSsl = true
-                };
+                var message = new MimeMessage();
+                var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? "";
+                var senderName = _configuration["EmailSettings:SenderName"] ?? "Eco-Ipil";
+                var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
 
-                var mailMessage = new MailMessage
+                message.From.Add(new MailboxAddress(senderName, senderEmail));
+                message.To.Add(new MailboxAddress("", email));
+                message.Subject = "Bem-vindo ao Eco-Ipil!";
+
+                var bodyBuilder = new BodyBuilder
                 {
-                    From = new MailAddress(_configuration["EmailSettings:SenderEmail"], _configuration["EmailSettings:SenderName"]),
-                    Subject = "Bem-vindo ao Eco-Ipil!",
-                    IsBodyHtml = true,
-                    Body = $@"<!DOCTYPE html>
+                    HtmlBody = $@"<!DOCTYPE html>
 <html lang='pt'>
 <head>
     <meta charset='UTF-8'>
@@ -371,9 +370,21 @@ namespace EcoIpil.API.Services
 </body>
 </html>"
                 };
-                mailMessage.To.Add(email);
 
-                await smtpClient.SendMailAsync(mailMessage);
+                message.Body = bodyBuilder.ToMessageBody();
+
+                using (var smtpClient = new SmtpClient())
+                {
+                    var smtpServer = _configuration["EmailSettings:SmtpServer"] ?? "smtp.gmail.com";
+                    var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
+                    var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
+
+                    await smtpClient.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
+                    await smtpClient.AuthenticateAsync(senderEmail, senderPassword);
+                    await smtpClient.SendAsync(message);
+                    await smtpClient.DisconnectAsync(true);
+                }
+
                 return (true, "E-mail de boas-vindas enviado com sucesso");
             }
             catch (Exception ex)

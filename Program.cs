@@ -122,7 +122,12 @@ builder.Services.AddSession(options =>
 });
 
 // CORS
-builder.Services.AddCors(options => options.AddPolicy("AllowReact", policy => policy.WithOrigins("http://localhost:5173").AllowAnyMethod().AllowAnyHeader()));
+var allowedOrigins = (builder.Configuration["CORS:Origins"] ?? "http://localhost:5173").Split(',', StringSplitOptions.TrimEntries);
+builder.Services.AddCors(options => options.AddPolicy("AllowReact", policy => policy
+    .WithOrigins(allowedOrigins)
+    .AllowAnyMethod()
+    .AllowAnyHeader()
+    .AllowCredentials()));
 
 // Configuração da porta para o Railway
 builder.WebHost.UseUrls($"http://0.0.0.0:3000");
