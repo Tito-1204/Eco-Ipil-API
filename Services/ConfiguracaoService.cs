@@ -371,19 +371,35 @@ namespace EcoIpil.API.Services
                     if (!int.TryParse(smtpPortStr, out int smtpPort))
                         throw new InvalidOperationException("SmtpPort inválido");
 
-                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
-                    await client.AuthenticateAsync(
-                        _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado"),
-                        (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "") ?? throw new InvalidOperationException("SenderPassword não configurado")
-                    );
-                    await client.SendAsync(message);
+                    client.Timeout = 10000;
+                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+                    var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado");
+                    var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
+
+                    Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                    Console.WriteLine("SMTP: Conectado. Autenticando...");
+
+                    using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await client.AuthenticateAsync(senderEmail, senderPassword, cts2.Token);
+                    Console.WriteLine("SMTP: Autenticado. Enviando...");
+
+                    using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await client.SendAsync(message, cts3.Token);
+                    Console.WriteLine("SMTP: Email enviado. Desconectando...");
+
                     await client.DisconnectAsync(true);
                     Console.WriteLine($"Email de confirmação enviado para {email} com código {code}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro ao enviar email de confirmação: {ex.Message}");
+                Console.WriteLine($"ERRO ao enviar email de confirmação: {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine($"StackTrace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                    Console.WriteLine($"InnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
                 throw;
             }
         }
@@ -448,19 +464,35 @@ namespace EcoIpil.API.Services
                     if (!int.TryParse(smtpPortStr, out int smtpPort))
                         throw new InvalidOperationException("SmtpPort inválido");
 
-                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
-                    await client.AuthenticateAsync(
-                        _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado"),
-                        (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "") ?? throw new InvalidOperationException("SenderPassword não configurado")
-                    );
-                    await client.SendAsync(message);
+                    client.Timeout = 10000;
+                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+                    var senderEmail2 = _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado");
+                    var senderPassword2 = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
+
+                    Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                    Console.WriteLine("SMTP: Conectado. Autenticando...");
+
+                    using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await client.AuthenticateAsync(senderEmail2, senderPassword2, cts2.Token);
+                    Console.WriteLine("SMTP: Autenticado. Enviando...");
+
+                    using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await client.SendAsync(message, cts3.Token);
+                    Console.WriteLine("SMTP: Email enviado. Desconectando...");
+
                     await client.DisconnectAsync(true);
                     Console.WriteLine($"Email de confirmação enviado para {email} com token {token}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro ao enviar email de confirmação: {ex.Message}");
+                Console.WriteLine($"ERRO ao enviar email de confirmação: {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine($"StackTrace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                    Console.WriteLine($"InnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
                 throw;
             }
         }

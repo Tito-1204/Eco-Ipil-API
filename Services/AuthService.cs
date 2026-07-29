@@ -394,9 +394,22 @@ namespace EcoIpil.API.Services
                     var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
                     var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
 
-                    await smtpClient.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
-                    await smtpClient.AuthenticateAsync(senderEmail, senderPassword);
-                    await smtpClient.SendAsync(message);
+                    smtpClient.Timeout = 10000;
+                    smtpClient.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+                    Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await smtpClient.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                    Console.WriteLine("SMTP: Conectado. Autenticando...");
+
+                    using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await smtpClient.AuthenticateAsync(senderEmail, senderPassword, cts2.Token);
+                    Console.WriteLine("SMTP: Autenticado. Enviando...");
+
+                    using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    await smtpClient.SendAsync(message, cts3.Token);
+                    Console.WriteLine("SMTP: Email enviado. Desconectando...");
+
                     await smtpClient.DisconnectAsync(true);
                 }
 
@@ -405,7 +418,12 @@ namespace EcoIpil.API.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erro ao enviar e-mail de boas-vindas: {ex.Message}");
+                Console.WriteLine($"ERRO ao enviar e-mail de boas-vindas: {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine($"StackTrace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"InnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                }
                 return (false, $"Erro ao enviar e-mail de boas-vindas: {ex.Message}");
             }
         }

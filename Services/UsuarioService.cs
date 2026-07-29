@@ -551,7 +551,12 @@ public class UsuarioService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao solicitar recuperação de senha: {ex.Message}");
+            Console.WriteLine($"ERRO ao solicitar recuperação de senha: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"InnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+            }
             return (false, "Erro ao solicitar recuperação de senha");
         }
     }
@@ -657,22 +662,40 @@ public class UsuarioService
 
             using (var client = new SmtpClient())
             {
-            var smtpServer = _configuration["EmailSettings:SmtpServer"];
-            var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
-            var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
-            var senderEmail = _configuration["EmailSettings:SenderEmail"];
-            var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
+                var smtpServer = _configuration["EmailSettings:SmtpServer"];
+                var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
+                var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
+                var senderEmail = _configuration["EmailSettings:SenderEmail"];
+                var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
 
-            await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
-            await client.AuthenticateAsync(senderEmail, senderPassword);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
-            Console.WriteLine($"Email de recuperação enviado para {email} com código {codigo}");
+                client.Timeout = 10000;
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+                Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                Console.WriteLine("SMTP: Conectado. Autenticando...");
+
+                using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await client.AuthenticateAsync(senderEmail, senderPassword, cts2.Token);
+                Console.WriteLine("SMTP: Autenticado. Enviando...");
+
+                using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await client.SendAsync(message, cts3.Token);
+                Console.WriteLine("SMTP: Email enviado. Desconectando...");
+
+                await client.DisconnectAsync(true);
+                Console.WriteLine($"Email de recuperação enviado para {email} com código {codigo}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao enviar email de recuperação: {ex.Message}");
+            Console.WriteLine($"ERRO ao enviar email de recuperação: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"InnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+            }
             throw;
         }
     }

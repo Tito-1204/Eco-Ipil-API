@@ -96,24 +96,34 @@ public class NotificacaoService
                 var senderEmail = _configuration["EmailSettings:SenderEmail"];
                 var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
 
-                _logger.LogInformation("Tentando conectar ao servidor SMTP {SmtpServer}:{SmtpPort}", smtpServer, smtpPort);
-                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
-                _logger.LogInformation("Conectado ao servidor SMTP com sucesso");
+                client.Timeout = 10000;
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
-                _logger.LogInformation("Tentando autenticar com {SenderEmail}", senderEmail);
-                await client.AuthenticateAsync(senderEmail, senderPassword);
-                _logger.LogInformation("Autenticado com sucesso");
+                _logger.LogInformation("SMTP: Conectando a {Server}:{Port}", smtpServer, smtpPort);
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                _logger.LogInformation("SMTP: Conectado");
 
-                _logger.LogInformation("Enviando email para {Email}", email);
-                await client.SendAsync(message);
-                _logger.LogInformation("Email enviado com sucesso para {Email}", email);
+                _logger.LogInformation("SMTP: Autenticando como {Email}", senderEmail);
+                using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await client.AuthenticateAsync(senderEmail, senderPassword, cts2.Token);
+                _logger.LogInformation("SMTP: Autenticado");
+
+                _logger.LogInformation("SMTP: Enviando email para {Email}", email);
+                using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await client.SendAsync(message, cts3.Token);
+                _logger.LogInformation("SMTP: Email enviado");
 
                 await client.DisconnectAsync(true);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erro ao enviar email para {Email}: {Message}", email, ex.Message);
+            _logger.LogError(ex, "ERRO ao enviar email para {Email}: {Type}: {Message}", email, ex.GetType().Name, ex.Message);
+            if (ex.InnerException != null)
+            {
+                _logger.LogError("InnerException: {Type}: {Message}", ex.InnerException.GetType().Name, ex.InnerException.Message);
+            }
             throw;
         }
     }
