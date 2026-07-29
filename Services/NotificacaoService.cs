@@ -38,7 +38,8 @@ public class NotificacaoService
         try
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress("EcoIpil", _configuration["EmailSettings:SenderEmail"]));
+            var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
+            message.From.Add(new MailboxAddress(senderName, _configuration["EmailSettings:SenderEmail"]));
             message.To.Add(new MailboxAddress("", email));
             message.Subject = $"Notificação EcoIpil: {tipo}";
 

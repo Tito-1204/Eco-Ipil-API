@@ -20,6 +20,7 @@ namespace EcoIpil.API.Services
             var smtpUsername = _configuration["EmailSettings:SenderEmail"];
             var smtpPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
             var fromEmail = _configuration["EmailSettings:SenderEmail"];
+            var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
 
             using var client = new SmtpClient(smtpHost, smtpPort)
             {
@@ -29,7 +30,7 @@ namespace EcoIpil.API.Services
 
             var mailMessage = new MailMessage
             {
-                From = new MailAddress(fromEmail),
+                From = new MailAddress(fromEmail, senderName),
                 Subject = subject,
                 Body = body,
                 IsBodyHtml = false

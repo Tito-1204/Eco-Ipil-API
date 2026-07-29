@@ -316,9 +316,10 @@ namespace EcoIpil.API.Services
             try
             {
                 var message = new MimeMessage();
-                message.From.Add(new MailboxAddress("EcoIpil", _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado")));
+                var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
+                message.From.Add(new MailboxAddress(senderName, _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado")));
                 message.To.Add(new MailboxAddress("", email));
-                message.Subject = "Confirmação de Alteração de Telefone";
+                message.Subject = "Confirmação de Código - ECO";
 
                 var bodyBuilder = new BodyBuilder();
                 bodyBuilder.HtmlBody = $@"
@@ -327,7 +328,7 @@ namespace EcoIpil.API.Services
                     <head>
                         <meta charset=""UTF-8"">
                         <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-                        <title>Confirmação de Alteração de Telefone - EcoIpil</title>
+                        <title>Confirmação de Código - ECO</title>
                         <style>
                             body {{ font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }}
                             .container {{ max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden; }}
@@ -392,7 +393,8 @@ namespace EcoIpil.API.Services
             try
             {
                 var message = new MimeMessage();
-                message.From.Add(new MailboxAddress("EcoIpil", _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado")));
+                var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
+                message.From.Add(new MailboxAddress(senderName, _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado")));
                 message.To.Add(new MailboxAddress("", email));
                 message.Subject = "Confirmação de Alteração de Email";
 

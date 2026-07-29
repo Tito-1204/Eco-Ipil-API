@@ -304,11 +304,12 @@ namespace EcoIpil.API.Services
 
         public async Task<(bool success, string message)> SendWelcomeEmail(string email, string nome)
         {
+            var codigo = GenerateVerificationCode();
+
             try
             {
-                var codigo = GenerateVerificationCode();
                 var client = _supabaseService.GetClient();
-                
+
                 var codigoVerificacao = new CodigoVerificacao
                 {
                     Email = email,
@@ -318,16 +319,30 @@ namespace EcoIpil.API.Services
                     ExpiraEm = DateTime.UtcNow.AddHours(24)
                 };
 
-                await client.From<CodigoVerificacao>().Insert(codigoVerificacao);
+                try
+                {
+                    await client.From<CodigoVerificacao>().Insert(codigoVerificacao);
+                }
+                catch (Exception dbEx)
+                {
+                    Console.WriteLine($"Aviso: Falha ao salvar código na BD: {dbEx.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Aviso: Falha ao obter cliente Supabase: {ex.Message}");
+            }
+
+            try
+            {
+                var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? "";
+                var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
+                var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
 
                 var message = new MimeMessage();
-                var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? "";
-                var senderName = _configuration["EmailSettings:SenderName"] ?? "Eco-Ipil";
-                var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
-
                 message.From.Add(new MailboxAddress(senderName, senderEmail));
                 message.To.Add(new MailboxAddress("", email));
-                message.Subject = "Bem-vindo ao Eco-Ipil!";
+                message.Subject = "Bem-vindo ao ECO!";
 
                 var bodyBuilder = new BodyBuilder
                 {
@@ -352,18 +367,18 @@ namespace EcoIpil.API.Services
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>Eco-Ipil</h1>
+            <h1>ECO</h1>
         </div>
         <div class='content'>
             <h2>Olá, {nome}!</h2>
-            <p>Bem-vindo ao <strong>Eco-Ipil</strong>, o teu parceiro na missão de tornar o mundo mais verde! Estamos bué felizes por teres juntado a nossa comunidade de recicladores. 🌍</p>
+            <p>Bem-vindo ao <strong>ECO</strong>, o teu parceiro na missão de tornar o mundo mais verde! Estamos bué felizes por teres juntado a nossa comunidade de recicladores. 🌍</p>
             <p>Para confirmar que este e-mail é mesmo teu, usa o código abaixo:</p>
             <div class='code'>{codigo.Substring(0, 4)}-{codigo.Substring(4, 4)}</div>
             <p>Este código expira em 24 horas, por isso usa-o logo! Se precisares de ajuda, é só contactar-nos.</p>
             <p>Juntos, vamos fazer a diferença! 🚀</p>
         </div>
         <div class='footer'>
-            <p>&copy; 2025 Eco-Ipil. Todos os direitos reservados.</p>
+            <p>&copy; 2025 ECO. Todos os direitos reservados.</p>
             <p><a href='https://eco-ipil.com'>Visita o nosso site</a></p>
         </div>
     </div>
@@ -385,6 +400,7 @@ namespace EcoIpil.API.Services
                     await smtpClient.DisconnectAsync(true);
                 }
 
+                Console.WriteLine($"Email de boas-vindas enviado para {email}");
                 return (true, "E-mail de boas-vindas enviado com sucesso");
             }
             catch (Exception ex)

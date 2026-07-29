@@ -517,11 +517,33 @@ public class UsuarioService
             var codigo = new Random().Next(10000000, 99999999).ToString();
             var expiresAt = DateTime.UtcNow.AddHours(1);
 
-            await _supabaseClient.Rpc("inserir_recuperacao_senha", new { 
-                p_user_id = usuario.Id, 
-                p_codigo = codigo, 
-                p_expires_at = expiresAt 
-            });
+            try
+            {
+                await _supabaseClient.Rpc("inserir_recuperacao_senha", new { 
+                    p_user_id = usuario.Id, 
+                    p_codigo = codigo, 
+                    p_expires_at = expiresAt 
+                });
+            }
+            catch (Exception rpcEx)
+            {
+                Console.WriteLine($"Aviso: RPC inserir_recuperacao_senha falhou: {rpcEx.Message}. Tentando inserção direta...");
+                try
+                {
+                    var novaRecuperacao = new RecuperacaoSenha
+                    {
+                        UserId = usuario.Id,
+                        Codigo = codigo,
+                        ExpiresAt = expiresAt,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _supabaseClient.From<RecuperacaoSenha>().Insert(novaRecuperacao);
+                }
+                catch (Exception insertEx)
+                {
+                    Console.WriteLine($"Aviso: Inserção direta também falhou: {insertEx.Message}");
+                }
+            }
 
             await SendRecoveryEmail(email, codigo);
 
@@ -585,7 +607,8 @@ public class UsuarioService
         try
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress("EcoIpil", _configuration["EmailSettings:SenderEmail"]));
+            var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
+            message.From.Add(new MailboxAddress(senderName, _configuration["EmailSettings:SenderEmail"]));
             message.To.Add(new MailboxAddress("", email));
             message.Subject = "Recuperação de Senha - EcoIpil";
 
