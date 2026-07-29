@@ -379,7 +379,7 @@ namespace EcoIpil.API.Services
 
                     Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.SslOnConnect, cts.Token);
                     Console.WriteLine("SMTP: Conectado. Autenticando...");
 
                     using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -472,7 +472,7 @@ namespace EcoIpil.API.Services
 
                     Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                    await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.SslOnConnect, cts.Token);
                     Console.WriteLine("SMTP: Conectado. Autenticando...");
 
                     using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));

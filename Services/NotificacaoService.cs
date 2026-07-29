@@ -101,7 +101,7 @@ public class NotificacaoService
 
                 _logger.LogInformation("SMTP: Conectando a {Server}:{Port}", smtpServer, smtpPort);
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls, cts.Token);
+                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.SslOnConnect, cts.Token);
                 _logger.LogInformation("SMTP: Conectado");
 
                 _logger.LogInformation("SMTP: Autenticando como {Email}", senderEmail);
