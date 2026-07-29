@@ -93,7 +93,7 @@ public class NotificacaoService
                 var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
                 var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
                 var senderEmail = _configuration["EmailSettings:SenderEmail"];
-                var senderPassword = _configuration["EmailSettings:SenderPassword"];
+                var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
 
                 _logger.LogInformation("Tentando conectar ao servidor SMTP {SmtpServer}:{SmtpPort}", smtpServer, smtpPort);
                 await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);

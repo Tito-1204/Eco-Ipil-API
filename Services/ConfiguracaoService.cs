@@ -373,7 +373,7 @@ namespace EcoIpil.API.Services
                     await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
                     await client.AuthenticateAsync(
                         _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado"),
-                        _configuration["EmailSettings:SenderPassword"] ?? throw new InvalidOperationException("SenderPassword não configurado")
+                        (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "") ?? throw new InvalidOperationException("SenderPassword não configurado")
                     );
                     await client.SendAsync(message);
                     await client.DisconnectAsync(true);
@@ -449,7 +449,7 @@ namespace EcoIpil.API.Services
                     await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
                     await client.AuthenticateAsync(
                         _configuration["EmailSettings:SenderEmail"] ?? throw new InvalidOperationException("SenderEmail não configurado"),
-                        _configuration["EmailSettings:SenderPassword"] ?? throw new InvalidOperationException("SenderPassword não configurado")
+                        (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "") ?? throw new InvalidOperationException("SenderPassword não configurado")
                     );
                     await client.SendAsync(message);
                     await client.DisconnectAsync(true);
