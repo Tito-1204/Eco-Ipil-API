@@ -21,6 +21,7 @@ namespace EcoIpil.API.Services
     {
         private readonly IConfiguration _configuration;
         private readonly SupabaseService _supabaseService;
+        private readonly EmailSenderService _emailSender;
         private static readonly Regex EmailRegex = new Regex(@"^[^\s@]+@[^\s@]{1,20}\.[a-zA-Z]{2,3}$", RegexOptions.Compiled);
         private static readonly Regex PasswordRegex = new Regex(@"^(?=.*[A-Z])(?=.*\d)[^\s]{8,}$", RegexOptions.Compiled);
         private static readonly Regex PhoneRegex = new Regex(@"^\+244\d{9}$", RegexOptions.Compiled);
@@ -39,10 +40,11 @@ namespace EcoIpil.API.Services
             "yandex.com"
         };
 
-        public AuthService(IConfiguration configuration, SupabaseService supabaseService)
+        public AuthService(IConfiguration configuration, SupabaseService supabaseService, EmailSenderService emailSender)
         {
             _configuration = configuration;
             _supabaseService = supabaseService;
+            _emailSender = emailSender;
         }
 
         public async Task<(bool success, string message, string? token)> Login(LoginDTO loginDto)
@@ -333,20 +335,7 @@ namespace EcoIpil.API.Services
                 Console.WriteLine($"Aviso: Falha ao obter cliente Supabase: {ex.Message}");
             }
 
-            try
-            {
-                var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? "";
-                var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
-                var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
-
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress(senderName, senderEmail));
-                message.To.Add(new MailboxAddress("", email));
-                message.Subject = "Bem-vindo ao ECO!";
-
-                var bodyBuilder = new BodyBuilder
-                {
-                    HtmlBody = $@"<!DOCTYPE html>
+            var htmlBody = $@"<!DOCTYPE html>
 <html lang='pt'>
 <head>
     <meta charset='UTF-8'>
@@ -383,36 +372,11 @@ namespace EcoIpil.API.Services
         </div>
     </div>
 </body>
-</html>"
-                };
+</html>";
 
-                message.Body = bodyBuilder.ToMessageBody();
-
-                using (var smtpClient = new SmtpClient())
-                {
-                    var smtpServer = _configuration["EmailSettings:SmtpServer"] ?? "smtp.gmail.com";
-                    var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
-                    var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
-
-                    smtpClient.Timeout = 10000;
-                    smtpClient.ServerCertificateValidationCallback = (s, c, h, e) => true;
-
-                    Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    await smtpClient.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.SslOnConnect, cts.Token);
-                    Console.WriteLine("SMTP: Conectado. Autenticando...");
-
-                    using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    await smtpClient.AuthenticateAsync(senderEmail, senderPassword, cts2.Token);
-                    Console.WriteLine("SMTP: Autenticado. Enviando...");
-
-                    using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    await smtpClient.SendAsync(message, cts3.Token);
-                    Console.WriteLine("SMTP: Email enviado. Desconectando...");
-
-                    await smtpClient.DisconnectAsync(true);
-                }
-
+            var (sent, msg) = await _emailSender.SendEmailAsync(email, "Bem-vindo ao ECO!", htmlBody);
+            if (sent)
+            {
                 Console.WriteLine($"Email de boas-vindas enviado para {email}");
                 return (true, "E-mail de boas-vindas enviado com sucesso");
             }

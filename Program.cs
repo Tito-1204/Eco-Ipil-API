@@ -110,6 +110,12 @@ builder.Services.AddHostedService<RecompensaNotificacaoSchedulerService>();
 builder.Services.AddHostedService<CampanhaVerificationService>();
 builder.Services.AddSingleton<SupabaseService>();
 builder.Services.AddSingleton<EmailService>();
+builder.Services.AddSingleton<EmailSenderService>();
+builder.Services.AddHttpClient("SendGrid", client =>
+{
+    client.BaseAddress = new Uri("https://api.sendgrid.com");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddHttpContextAccessor();
 
 // Adicionar suporte a sessões

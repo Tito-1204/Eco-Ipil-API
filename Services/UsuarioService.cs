@@ -27,14 +27,16 @@ public class UsuarioService
     private readonly Supabase.Client _supabaseAdminClient; // Cliente para operações administrativas (Storage)
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
+    private readonly EmailSenderService _emailSender;
     private const string BUCKET_FOTOS_PERFIL = "fotos";
 
-    public UsuarioService(SupabaseService supabaseService, IHttpContextAccessor httpContextAccessor, IConfiguration configuration)
+    public UsuarioService(SupabaseService supabaseService, IHttpContextAccessor httpContextAccessor, IConfiguration configuration, EmailSenderService emailSender)
     {
         _supabaseClient = supabaseService.GetClient();
         _supabaseAdminClient = supabaseService.GetAdminClient(); // Cliente admin para Storage
         _httpContextAccessor = httpContextAccessor;
         _configuration = configuration;
+        _emailSender = emailSender;
         Task.Run(InicializarBucketFotosPerfil).Wait(); // Inicializa o bucket ao iniciar o serviço
     }
     
@@ -609,94 +611,52 @@ public class UsuarioService
 
     private async Task SendRecoveryEmail(string email, string codigo)
     {
-        try
-        {
-            var message = new MimeMessage();
-            var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
-            message.From.Add(new MailboxAddress(senderName, _configuration["EmailSettings:SenderEmail"]));
-            message.To.Add(new MailboxAddress("", email));
-            message.Subject = "Recuperação de Senha - EcoIpil";
-
-            var bodyBuilder = new BodyBuilder();
-            bodyBuilder.HtmlBody = $@"
-                <!DOCTYPE html>
-                <html lang='pt-BR'>
-                <head>
-                    <meta charset='UTF-8'>
-                    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                    <title>Recuperação de Senha - EcoIpil</title>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }}
-                        .container {{ max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden; }}
-                        .header {{ background-color: #28a745; color: #ffffff; text-align: center; padding: 20px; }}
-                        .header h1 {{ margin: 0; font-size: 24px; }}
-                        .content {{ padding: 30px; text-align: center; color: #333333; }}
-                        .content h2 {{ font-size: 20px; margin-bottom: 20px; }}
-                        .code-box {{ background-color: #e8f5e9; border: 2px dashed #28a745; padding: 15px; font-size: 24px; font-weight: bold; color: #28a745; margin: 20px 0; letter-spacing: 2px; }}
-                        .content p {{ font-size: 16px; line-height: 1.5; margin: 10px 0; }}
-                        .footer {{ background-color: #f4f4f4; text-align: center; padding: 15px; font-size: 14px; color: #666666; }}
-                        .footer a {{ color: #28a745; text-decoration: none; }}
-                    </style>
-                </head>
-                <body>
-                    <div class='container'>
-                        <div class='header'>
-                            <h1>EcoIpil</h1>
-                        </div>
-                        <div class='content'>
-                            <h2>Recuperação de Senha</h2>
-                            <p>Olá! Recebemos uma solicitação para redefinir a senha da sua conta EcoIpil.</p>
-                            <p>Para continuar, use o código abaixo no aplicativo:</p>
-                            <div class='code-box'>{codigo}</div>
-                            <p>Este código é válido por 1 hora. Se você não solicitou essa alteração, ignore este email ou entre em contato com nosso suporte.</p>
-                        </div>
-                        <div class='footer'>
-                            <p>Precisa de ajuda? <a href='mailto:suporte@eco-ipil.com'>Entre em contato com o suporte</a></p>
-                            <p>&copy; 2023 EcoIpil. Todos os direitos reservados.</p>
-                        </div>
+        var htmlBody = $@"
+            <!DOCTYPE html>
+            <html lang='pt-BR'>
+            <head>
+                <meta charset='UTF-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                <title>Recuperação de Senha</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }}
+                    .container {{ max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden; }}
+                    .header {{ background-color: #28a745; color: #ffffff; text-align: center; padding: 20px; }}
+                    .header h1 {{ margin: 0; font-size: 24px; }}
+                    .content {{ padding: 30px; text-align: center; color: #333333; }}
+                    .content h2 {{ font-size: 20px; margin-bottom: 20px; }}
+                    .code-box {{ background-color: #e8f5e9; border: 2px dashed #28a745; padding: 15px; font-size: 24px; font-weight: bold; color: #28a745; margin: 20px 0; letter-spacing: 2px; }}
+                    .content p {{ font-size: 16px; line-height: 1.5; margin: 10px 0; }}
+                    .footer {{ background-color: #f4f4f4; text-align: center; padding: 15px; font-size: 14px; color: #666666; }}
+                    .footer a {{ color: #28a745; text-decoration: none; }}
+                </style>
+            </head>
+            <body>
+                <div class='container'>
+                    <div class='header'>
+                        <h1>ECO</h1>
                     </div>
-                </body>
-                </html>";
+                    <div class='content'>
+                        <h2>Recuperação de Senha</h2>
+                        <p>Olá! Recebemos uma solicitação para redefinir a senha da sua conta ECO.</p>
+                        <p>Para continuar, use o código abaixo no aplicativo:</p>
+                        <div class='code-box'>{codigo}</div>
+                        <p>Este código é válido por 1 hora. Se você não solicitou essa alteração, ignore este email ou entre em contato com nosso suporte.</p>
+                    </div>
+                    <div class='footer'>
+                        <p>Precisa de ajuda? <a href='mailto:suporte@eco-ipil.com'>Entre em contato com o suporte</a></p>
+                        <p>&copy; 2023 ECO. Todos os direitos reservados.</p>
+                    </div>
+                </div>
+            </body>
+            </html>";
 
-            message.Body = bodyBuilder.ToMessageBody();
-
-            using (var client = new SmtpClient())
-            {
-                var smtpServer = _configuration["EmailSettings:SmtpServer"];
-                var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
-                var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
-                var senderEmail = _configuration["EmailSettings:SenderEmail"];
-                var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
-
-                client.Timeout = 10000;
-                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-
-                Console.WriteLine($"SMTP: Conectando a {smtpServer}:{smtpPort}...");
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.SslOnConnect, cts.Token);
-                Console.WriteLine("SMTP: Conectado. Autenticando...");
-
-                using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await client.AuthenticateAsync(senderEmail, senderPassword, cts2.Token);
-                Console.WriteLine("SMTP: Autenticado. Enviando...");
-
-                using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await client.SendAsync(message, cts3.Token);
-                Console.WriteLine("SMTP: Email enviado. Desconectando...");
-
-                await client.DisconnectAsync(true);
-                Console.WriteLine($"Email de recuperação enviado para {email} com código {codigo}");
-            }
-        }
-        catch (Exception ex)
+        var (sent, msg) = await _emailSender.SendEmailAsync(email, "Recuperação de Senha", htmlBody);
+        if (!sent)
         {
-            Console.WriteLine($"ERRO ao enviar email de recuperação: {ex.GetType().Name}: {ex.Message}");
-            Console.WriteLine($"StackTrace: {ex.StackTrace}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"InnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
-            }
-            throw;
+            Console.WriteLine($"ERRO ao enviar email de recuperação: {msg}");
+            throw new Exception(msg);
         }
+        Console.WriteLine($"Email de recuperação enviado para {email} com código {codigo}");
     }
 }
