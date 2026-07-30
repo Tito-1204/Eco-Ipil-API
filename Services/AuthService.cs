@@ -374,11 +374,15 @@ namespace EcoIpil.API.Services
 </body>
 </html>";
 
-            var (sent, msg) = await _emailSender.SendEmailAsync(email, "Bem-vindo ao ECO!", htmlBody);
-            if (sent)
+            try
             {
-                Console.WriteLine($"Email de boas-vindas enviado para {email}");
-                return (true, "E-mail de boas-vindas enviado com sucesso");
+                var (sent, msg) = await _emailSender.SendEmailAsync(email, "Bem-vindo ao ECO!", htmlBody);
+                if (sent)
+                {
+                    Console.WriteLine($"Email de boas-vindas enviado para {email}");
+                    return (true, "E-mail de boas-vindas enviado com sucesso");
+                }
+                Console.WriteLine($"SendGrid/SMTP retornou falha: {msg}");
             }
             catch (Exception ex)
             {
@@ -390,6 +394,7 @@ namespace EcoIpil.API.Services
                 }
                 return (false, $"Erro ao enviar e-mail de boas-vindas: {ex.Message}");
             }
+            return (false, "Não foi possível enviar o e-mail de boas-vindas");
         }
 
         public async Task<(bool success, string message)> VerifyEmailCode(string email, string codigo)
