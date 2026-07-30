@@ -64,8 +64,9 @@ namespace EcoIpil.API.Services
             {
                 var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? "";
                 var senderPassword = (_configuration["EmailSettings:SenderPassword"] ?? "").Replace(" ", "");
+                var smtpUsername = _configuration["EmailSettings:SmtpUsername"] ?? senderEmail;
                 var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
-                var smtpServer = _configuration["EmailSettings:SmtpServer"] ?? "smtp.gmail.com";
+                var smtpServer = _configuration["EmailSettings:SmtpServer"] ?? "smtp.sendgrid.net";
                 var smtpPortStr = _configuration["EmailSettings:SmtpPort"];
                 var smtpPort = !string.IsNullOrEmpty(smtpPortStr) ? int.Parse(smtpPortStr) : 587;
                 var useSsl = smtpPort == 465;
@@ -90,7 +91,7 @@ namespace EcoIpil.API.Services
                 Console.WriteLine("SMTP: Conectado. Autenticando...");
 
                 using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await client.AuthenticateAsync(senderEmail, senderPassword, cts2.Token);
+                await client.AuthenticateAsync(smtpUsername, senderPassword, cts2.Token);
                 Console.WriteLine("SMTP: Autenticado. Enviando...");
 
                 using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
