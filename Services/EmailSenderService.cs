@@ -1,20 +1,17 @@
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
 using MailKit.Net.Smtp;
 using MimeKit;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace EcoIpil.API.Services
 {
     public class EmailSenderService
     {
         private readonly IConfiguration _configuration;
-        private readonly IHttpClientFactory _httpClientFactory;
 
-        public EmailSenderService(IConfiguration configuration, IHttpClientFactory httpClientFactory)
+        public EmailSenderService(IConfiguration configuration)
         {
             _configuration = configuration;
-            _httpClientFactory = httpClientFactory;
         }
 
         public async Task<(bool success, string message)> SendEmailAsync(string toEmail, string subject, string htmlBody)
@@ -35,31 +32,13 @@ namespace EcoIpil.API.Services
                 var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? "";
                 var senderName = _configuration["EmailSettings:SenderName"] ?? "ECO";
 
-                var payload = new
-                {
-                    personalizations = new[]
-                    {
-                        new
-                        {
-                            to = new[] { new { email = toEmail } },
-                            subject
-                        }
-                    },
-                    from = new { email = senderEmail, name = senderName },
-                    content = new[]
-                    {
-                        new { type = "text/html", value = htmlBody }
-                    }
-                };
-
-                var json = JsonSerializer.Serialize(payload);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var client = _httpClientFactory.CreateClient("SendGrid");
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                var client = new SendGridClient(apiKey);
+                var from = new EmailAddress(senderEmail, senderName);
+                var to = new EmailAddress(toEmail);
+                var msg = MailHelper.CreateSingleEmail(from, to, subject, null, htmlBody);
 
                 Console.WriteLine($"SendGrid: Enviando email para {toEmail}...");
-                var response = await client.PostAsync("https://api.sendgrid.com/v3/mail/send", content);
+                var response = await client.SendEmailAsync(msg);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -67,7 +46,7 @@ namespace EcoIpil.API.Services
                     return (true, "Email enviado com sucesso");
                 }
 
-                var errorBody = await response.Content.ReadAsStringAsync();
+                var errorBody = await response.Body.ReadAsStringAsync();
                 Console.WriteLine($"SendGrid: Erro HTTP {(int)response.StatusCode}: {errorBody}");
                 return (false, $"SendGrid error: {response.StatusCode}");
             }
