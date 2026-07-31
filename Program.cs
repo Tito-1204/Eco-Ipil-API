@@ -123,7 +123,7 @@ builder.Services.AddSession(options =>
 });
 
 // CORS
-var allowedOrigins = (builder.Configuration["CORS:Origins"] ?? "http://localhost:5173").Split(',', StringSplitOptions.TrimEntries);
+var allowedOrigins = (builder.Configuration["CORS:Origins"] ?? "http://localhost:5173,https://eco-ipil-front.vercel.app").Split(',', StringSplitOptions.TrimEntries);
 builder.Services.AddCors(options => options.AddPolicy("AllowReact", policy => policy
     .WithOrigins(allowedOrigins)
     .AllowAnyMethod()
